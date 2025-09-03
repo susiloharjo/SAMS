@@ -134,7 +134,7 @@ async def run_chat_loop():
             ))
         
         model = genai.GenerativeModel(
-            model_name='gemini-1.5-flash',
+            model_name='gemini-2.5-flash',
             tools=gemini_tools
         )
         chat = model.start_chat(enable_automatic_function_calling=False)

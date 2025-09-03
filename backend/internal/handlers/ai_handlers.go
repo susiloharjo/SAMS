@@ -394,7 +394,7 @@ func HandleAIQuery(c *fiber.Ctx) error {
 	}
 	defer client.Close()
 
-	model := client.GenerativeModel("gemini-1.5-pro-latest")
+	model := client.GenerativeModel("gemini-2.5-flash")
 	cs := model.StartChat()
 
 	// Enhanced prompt that forces Gemini to use tool data
