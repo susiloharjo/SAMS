@@ -1,60 +1,105 @@
-# SAMS Project - Active Context
+# Active Context - SAMS Development
 
-## Current Phase: PLAN (MVP Planning)
-**Date**: MVP Planning
-**Focus**: Detailed implementation planning for 1-week MVP development
+## Current Focus
+**AI Assistant Department Query System** - Successfully implemented and tested
 
-## Project Context
-- **Project Name**: SAMS (Smart Asset Management System)
-- **Complexity Level**: 2-3 (Moderate to High - Focused MVP)
-- **Scope**: 1-Week MVP with core asset management features
-- **Timeline**: Aggressive 1-week development for government/client demo
-- **Team**: Single developer (can scale to team post-MVP)
+## Recent Achievements ✅
 
-## Current Objectives
-1. ✅ Complete Memory Bank system setup
-2. ✅ Initialize project structure and MVP scope
-3. 🔄 Create detailed MVP implementation plan
-4. ⏳ Begin rapid development for 1-week timeline
+### 1. **AI Assistant Department Queries - FULLY WORKING**
+- **Fixed Backend Tool Detection**: Added specific logic for department-related queries
+- **Department Name Recognition**: System now recognizes exact department names from database
+- **Smart Tool Routing**: Always routes to `get_assets_by_department` MCP tool
+- **MCP Server Integration**: Added `/list_tools` endpoint for backend compatibility
 
-## Technical Context (MVP)
-- **Architecture**: Single backend service (simplified for speed)
-- **Frontend**: Next.js + Tailwind CSS (rapid development)
-- **Backend**: Go (Golang) + simple REST API
-- **Database**: PostgreSQL (single database, simplified schema)
-- **Maps**: Google Maps API for geotagging and location display
-- **AI**: Google Gemini API (direct integration, no complex LangChain)
-- **QR**: Basic QR generation library
-- **Infrastructure**: Docker for development
+### 2. **Department Support - All Working**
+| Department | Status | Query Examples |
+|------------|--------|----------------|
+| **Project** | ✅ Working | "show me assets in Project department" |
+| **Finance** | ✅ Working | "show me assets in Finance department" |
+| **Human Capital (HC)** | ✅ Working | "show me assets in HC department" |
+| **Operation** | ✅ Working | "show me assets in Operations department" |
+| **Information Technology (IT)** | ✅ Working | "show me assets in IT department" |
+| **Marketing** | ✅ Working | "show me assets in Marketing department" |
 
-## Key Decisions Made
-- **Scope Adjustment**: Changed from enterprise system to focused MVP
-- **Timeline**: 1-week aggressive development schedule
-- **Complexity**: Reduced from Level 4 to Level 2-3
-- **Workflow**: Simplified to VAN → PLAN → IMPLEMENT → REFLECT → ARCHIVE
-- **Architecture**: Single service approach for MVP speed
+### 3. **AI Assistant Interface - Enhanced**
+- **Updated Welcome Message**: Clear explanation of capabilities and example questions
+- **Improved Sample Questions**: 8 practical, common asset-related queries
+- **Better Placeholder Text**: More specific guidance for users
+- **Modern UI**: Professional, user-friendly interface
 
-## MVP Features Priority
-1. **Asset CRUD** - ISO 55001 compliant asset management
-2. **Dynamic Categories** - User-defined asset categories
-3. **Location Management** - Map integration with geotagging
-4. **QR Code Generation** - Asset identification and tagging
-5. **LLM Integration** - AI queries for asset information
-6. **Demo Data** - Government buildings, IT equipment, vehicles
+### 4. **MCP Server - Fully Functional**
+- **All Endpoints Working**: `/list_tools`, `/tools`, `/call/{tool_name}`
+- **Tool Integration**: 12 MCP tools available for asset queries
+- **Backend Communication**: Seamless integration with Go backend
 
-## Next Phase Preparation
-- **Target Mode**: IMPLEMENT
-- **Focus Areas**: 
-  - Rapid MVP development
-  - Core feature implementation
-  - Demo preparation
-  - Government/client presentation
+## Current System Status
 
-## Current Blockers
-None identified - ready to proceed with MVP planning.
+### **Backend (Go)**
+- ✅ **AI Handler**: Properly routes department queries to MCP tools
+- ✅ **Tool Determination**: Smart logic for selecting appropriate MCP tools
+- ✅ **Gemini Integration**: Uses `gemini-1.5-pro-latest` model
+- ✅ **MCP Communication**: Successfully calls MCP server tools
 
-## Notes
-- Project scope adjusted for 1-week MVP timeline
-- Focus on core features for government/client demo
-- Simplified architecture for rapid development
-- ISO 55001 compliance maintained for professional credibility
+### **Frontend (Next.js)**
+- ✅ **AI Chat Interface**: Modern, responsive design
+- ✅ **Sample Questions**: Practical examples for users
+- ✅ **Welcome Message**: Clear capability explanation
+- ✅ **Navigation**: Responsive sidebar with Department link
+
+### **Database & Services**
+- ✅ **PostgreSQL**: 6 departments, 20+ dummy assets
+- ✅ **Redis**: Caching service running
+- ✅ **MCP Server**: Python FastAPI server with all tools
+- ✅ **Docker**: All services containerized and running
+
+## Technical Implementation Details
+
+### **Department Query Logic**
+```go
+// PRIORITY 2.5: Department-specific queries
+if strings.Contains(lowerMessage, "department") || strings.Contains(lowerMessage, "departement") ||
+    strings.Contains(lowerMessage, "dept") || strings.Contains(lowerMessage, "by department") {
+    
+    // Extract actual department name from query
+    departmentName := extractDepartmentName(lowerMessage)
+    
+    return "get_assets_by_department", map[string]interface{}{
+        "department": departmentName, 
+        "limit": 20
+    }
+}
+```
+
+### **MCP Tool Integration**
+- **Tool Selection**: Backend determines appropriate MCP tool
+- **Parameter Extraction**: Smart parameter mapping from user queries
+- **Result Processing**: Gemini AI uses MCP tool results as knowledge source
+- **Response Generation**: Professional, accurate responses based on tool data
+
+## Next Steps (Optional)
+
+### **Potential Enhancements**
+1. **Asset Creation**: Add more dummy assets to test department queries
+2. **Advanced Queries**: Implement complex multi-parameter searches
+3. **Performance**: Add caching for frequently requested data
+4. **Analytics**: Dashboard improvements for department-based insights
+
+### **Current Capabilities**
+- ✅ **Asset Queries**: By name, category, status, location, department
+- ✅ **Department Management**: Full CRUD operations
+- ✅ **Category Management**: Asset categorization system
+- ✅ **Location Tracking**: Interactive map integration
+- ✅ **QR Code System**: Individual and bulk generation
+- ✅ **AI Assistant**: Natural language asset queries
+- ✅ **User Management**: Role-based access control
+
+## System Health
+- **All Services**: Running and healthy
+- **AI Assistant**: Fully functional with department queries
+- **Database**: Stable with test data
+- **Frontend**: Responsive and modern UI
+- **Backend**: Robust API with error handling
+- **MCP Server**: Integrated and functional
+
+## Last Updated
+**2025-09-03** - AI Assistant department queries fully implemented and tested
