@@ -11,7 +11,61 @@ import (
 
 	"sams-backend/internal/database"
 	"sams-backend/internal/models"
+
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
+
+type StatusSummary struct {
+	Status string `json:"name"`
+	Count  int64  `json:"value"`
+}
+
+// GetStatusSummary godoc
+// @Summary Get asset summary by status
+// @Description Get a count of assets grouped by status
+// @Tags assets
+// @Accept  json
+// @Produce  json
+// @Success 200 {array} StatusSummary
+// @Failure 500 {object} fiber.Map
+// @Router /assets/summary-by-status [get]
+func GetStatusSummary(c *fiber.Ctx) error {
+	db := database.GetDB()
+	var results []struct {
+		Name  string
+		Value int64
+	}
+
+	err := db.Model(&models.Asset{}).
+		Select("status as name, count(*) as value").
+		Group("status").
+		Scan(&results).Error
+
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": true, "message": "Failed to get status summary"})
+	}
+
+	// Ensure all statuses are present, even if count is 0
+	allStatuses := []string{"active", "maintenance", "inactive", "disposed"}
+	summaryMap := make(map[string]int64)
+	for _, r := range results {
+		summaryMap[r.Name] = r.Value
+	}
+
+	finalResults := []StatusSummary{}
+	for _, status := range allStatuses {
+		count, ok := summaryMap[status]
+		if !ok {
+			count = 0
+		}
+		// Capitalize the first letter for display
+		capitalizedStatus := cases.Title(language.English).String(status)
+		finalResults = append(finalResults, StatusSummary{Status: capitalizedStatus, Count: count})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"error": false, "data": finalResults})
+}
 
 type CategorySummary struct {
 	Name  string  `json:"name"`

@@ -84,6 +84,7 @@ func main() {
 	app.Get("/api/v1/assets", handlers.GetAssets)
 	app.Get("/api/v1/assets/summary", handlers.GetAssetSummary) // Moved up
 	app.Get("/api/v1/assets/summary-by-category", handlers.GetCategorySummary)
+	app.Get("/api/v1/assets/summary-by-status", handlers.GetStatusSummary)
 	app.Post("/api/v1/assets", handlers.CreateAsset)
 	app.Get("/api/v1/assets/:id", handlers.GetAsset)
 	app.Put("/api/v1/assets/:id", handlers.UpdateAsset)

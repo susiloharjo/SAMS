@@ -52,6 +52,7 @@ export default function Dashboard() {
     critical_assets: 0,
   })
   const [categoryChartData, setCategoryChartData] = useState([])
+  const [statusChartData, setStatusChartData] = useState([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -61,22 +62,25 @@ export default function Dashboard() {
 
   const fetchDashboardData = async () => {
     try {
-      const [summaryRes, recentAssetsRes, categoriesRes, categoryChartRes] = await Promise.all([
+      const [summaryRes, recentAssetsRes, categoriesRes, categoryChartRes, statusChartRes] = await Promise.all([
         fetch('http://localhost:8080/api/v1/assets/summary'),
         fetch('http://localhost:8080/api/v1/assets?limit=5&page=1'), // Fetch only 5 recent assets
         fetch('http://localhost:8080/api/v1/categories'),
-        fetch('http://localhost:8080/api/v1/assets/summary-by-category')
+        fetch('http://localhost:8080/api/v1/assets/summary-by-category'),
+        fetch('http://localhost:8080/api/v1/assets/summary-by-status')
       ])
       
       const summaryData = await summaryRes.json()
       const recentAssetsData = await recentAssetsRes.json()
       const categoriesData = await categoriesRes.json()
       const categoryChartData = await categoryChartRes.json()
+      const statusChartData = await statusChartRes.json()
       
       setSummary(summaryData.data || { total_assets: 0, total_value: 0, active_assets: 0, critical_assets: 0 })
       setRecentAssets(recentAssetsData.data || [])
       setCategories(categoriesData.data || [])
       setCategoryChartData(categoryChartData.data || [])
+      setStatusChartData(statusChartData.data || [])
     } catch (error) {
       console.error('Error fetching dashboard data:', error)
     } finally {
@@ -92,13 +96,6 @@ export default function Dashboard() {
   };
 
   // The chart data now comes directly from the API, so we remove the client-side calculation.
-  const statusData = [
-    { name: 'Active', value: recentAssets.filter(a => a.status === 'active').length, color: '#10B981' },
-    { name: 'Maintenance', value: recentAssets.filter(a => a.status === 'maintenance').length, color: '#F59E0B' },
-    { name: 'Inactive', value: recentAssets.filter(a => a.status === 'inactive').length, color: '#6B7280' },
-    { name: 'Disposed', value: recentAssets.filter(a => a.status === 'disposed').length, color: '#EF4444' }
-  ]
-
   const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D']
 
   if (loading) {
@@ -245,12 +242,22 @@ export default function Dashboard() {
         <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Asset Status Distribution</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={statusData}>
+            <BarChart data={statusChartData}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip />
-              <Bar dataKey="value" fill="#8884d8" />
+              <Bar dataKey="value" fill="#8884d8">
+                {statusChartData.map((entry, index) => {
+                  const colors = {
+                    'Active': '#10B981',
+                    'Maintenance': '#F59E0B',
+                    'Inactive': '#6B7280',
+                    'Disposed': '#EF4444'
+                  };
+                  return <Cell key={`cell-${index}`} fill={colors[entry.name] || '#8884d8'} />;
+                })}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
