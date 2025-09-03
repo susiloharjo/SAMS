@@ -29,7 +29,7 @@ export default function CategoriesPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`http://localhost:8080/api/v1/categories`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`);
       if (!response.ok) {
         throw new Error('Failed to fetch categories');
       }
@@ -64,8 +64,8 @@ export default function CategoriesPage() {
 
   const handleSave = async (categoryData: Partial<Category>) => {
     const url = selectedCategory
-      ? `http://localhost:8080/api/v1/categories/${selectedCategory.id}`
-      : `http://localhost:8080/api/v1/categories`;
+              ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories/${selectedCategory.id}`
+        : `${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`;
     const method = selectedCategory ? 'PUT' : 'POST';
 
     try {
@@ -94,7 +94,7 @@ export default function CategoriesPage() {
     if (!selectedCategory) return;
 
     try {
-      const response = await fetch(`http://localhost:8080/api/v1/categories/${selectedCategory.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories/${selectedCategory.id}`, {
         method: 'DELETE',
       });
 

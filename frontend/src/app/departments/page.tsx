@@ -24,7 +24,7 @@ export default function DepartmentsPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`http://localhost:8080/api/v1/departments`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments`);
       if (!response.ok) {
         throw new Error('Failed to fetch departments');
       }
@@ -59,8 +59,8 @@ export default function DepartmentsPage() {
 
   const handleSave = async (departmentData: Partial<Department>) => {
     const url = selectedDepartment
-      ? `http://localhost:8080/api/v1/departments/${selectedDepartment.id}`
-      : `http://localhost:8080/api/v1/departments`;
+              ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments/${selectedDepartment.id}`
+        : `${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments`;
     const method = selectedDepartment ? 'PUT' : 'POST';
 
     try {
@@ -89,7 +89,7 @@ export default function DepartmentsPage() {
     if (!selectedDepartment) return;
 
     try {
-      const response = await fetch(`http://localhost:8080/api/v1/departments/${selectedDepartment.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments/${selectedDepartment.id}`, {
         method: 'DELETE',
       });
 

@@ -36,7 +36,7 @@ WORKDIR /app
 COPY --from=builder /app/main .
 
 # Copy .env file if it exists
-COPY --from=builder /app/.env* ./
+COPY .env* ./
 
 # Make binary executable
 RUN chmod +x main

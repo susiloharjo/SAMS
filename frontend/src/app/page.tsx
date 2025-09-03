@@ -63,11 +63,11 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       const [summaryRes, recentAssetsRes, categoriesRes, categoryChartRes, statusChartRes] = await Promise.all([
-        fetch('http://localhost:8080/api/v1/assets/summary'),
-        fetch('http://localhost:8080/api/v1/assets?limit=5&page=1'), // Fetch only 5 recent assets
-        fetch('http://localhost:8080/api/v1/categories'),
-        fetch('http://localhost:8080/api/v1/assets/summary-by-category'),
-        fetch('http://localhost:8080/api/v1/assets/summary-by-status')
+              fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/summary`),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets?limit=5&page=1`), // Fetch only 5 recent assets
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/summary-by-category`),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/summary-by-status`)
       ])
       
       const summaryData = await summaryRes.json()

@@ -5,19 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
-)
-
-// Constants
-const (
-	mcpServerBaseURL = "http://sams-mcp-server:8081"
 )
 
 // Structs for AI Chat
@@ -29,204 +24,450 @@ type AIChatResponse struct {
 	Response string `json:"response"`
 }
 
-// Struct for MCP Tool Schemas
-type MCPToolProperty struct {
-	Type        string `json:"type"`
-	Description string `json:"description"`
+// MCP Server Integration
+type MCPToolCall struct {
+	ToolName string                 `json:"tool_name"`
+	Params   map[string]interface{} `json:"params"`
 }
 
-type MCPToolParameters struct {
-	Type       string                     `json:"type"`
-	Properties map[string]MCPToolProperty `json:"properties"`
-	Required   []string                   `json:"required"`
+type MCPToolResponse struct {
+	Result string `json:"result"`
 }
 
-type MCPTool struct {
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
-	Parameters  MCPToolParameters `json:"parameters"`
+// Asset-related keywords to detect when to use MCP tools
+var assetKeywords = []string{
+	"asset", "assets", "laptop", "computer", "equipment", "vehicle", "camera",
+	"printer", "tablet", "phone", "it", "hardware", "inventory", "summary",
+	"total", "value", "status", "category", "department", "search", "find",
+	"show", "list", "count", "maintenance", "active", "inactive", "disposed",
 }
 
-type MCPToolsResponse struct {
-	Tools []MCPTool `json:"tools"`
+// Check if the message is asset-related
+func isAssetRelated(message string) bool {
+	lowerMessage := strings.ToLower(message)
+
+	// Check for generic asset keywords
+	for _, keyword := range assetKeywords {
+		if strings.Contains(lowerMessage, keyword) {
+			return true
+		}
+	}
+
+	// Also check for specific asset references (brands, models, etc.)
+	if containsSpecificAssetReference(message) {
+		return true
+	}
+
+	return false
 }
 
-// getToolsFromMCP fetches tool definitions from the MCP server.
-func getToolsFromMCP() ([]*genai.Tool, error) {
-	resp, err := http.Get(mcpServerBaseURL + "/tools")
+// Check if a word is a common word that doesn't indicate a specific asset
+func isCommonWord(word string) bool {
+	commonWords := []string{
+		"the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with",
+		"by", "from", "up", "about", "into", "through", "during", "before", "after", "above",
+		"below", "between", "among", "asset", "assets", "show", "give", "me", "info", "about",
+		"what", "is", "are", "where", "when", "how", "why", "which", "who", "this", "that",
+		"these", "those", "here", "there", "now", "then", "today", "yesterday", "tomorrow",
+	}
+
+	lowerWord := strings.ToLower(word)
+	for _, common := range commonWords {
+		if lowerWord == common {
+			return true
+		}
+	}
+
+	return false
+}
+
+// Check if the message contains a specific asset reference
+func containsSpecificAssetReference(message string) bool {
+	// Common asset brands and models that indicate specific asset queries
+	specificAssetKeywords := []string{
+		"samsung", "galaxy", "tab", "lenovo", "thinkpad", "dell", "latitude", "hp", "elitebook",
+		"canon", "eos", "nikon", "sony", "apple", "macbook", "iphone", "ipad", "toyota", "honda",
+		"bosch", "lg", "epson", "cisco", "microsoft", "surface", "yamaha", "psr",
+	}
+
+	lowerMessage := strings.ToLower(message)
+
+	// Check if message contains specific asset keywords (brands/models)
+	for _, keyword := range specificAssetKeywords {
+		if strings.Contains(lowerMessage, keyword) {
+			return true
+		}
+	}
+
+	// Check for specific asset patterns (e.g., "Samsung Galaxy Tab S7", "Lenovo ThinkPad X1")
+	// Only if the message looks like it's asking about a specific asset, not general questions
+	words := strings.Fields(message)
+
+	// Skip if this looks like a general question (starts with question words)
+	questionWords := []string{"what", "how", "when", "where", "why", "which", "who", "show", "give", "tell", "find", "search", "get"}
+	if len(words) > 0 {
+		firstWord := strings.ToLower(strings.Trim(words[0], "?!.,"))
+		for _, qw := range questionWords {
+			if firstWord == qw {
+				// This is a general question, not a specific asset reference
+				return false
+			}
+		}
+	}
+
+	// Check if message contains what looks like a specific asset name
+	// Only if it doesn't contain general query words
+	generalQueryWords := []string{"total", "value", "cost", "worth", "summary", "overview", "count", "how many", "equipment", "assets", "category"}
+	for _, gqw := range generalQueryWords {
+		if strings.Contains(lowerMessage, gqw) {
+			// This is a general query, not a specific asset reference
+			return false
+		}
+	}
+
+	// If we get here, check if it looks like a specific asset name
+	if len(words) >= 2 {
+		// Look for brand + model patterns
+		hasBrand := false
+		hasModel := false
+
+		for _, word := range words {
+			lowerWord := strings.ToLower(word)
+			if len(word) > 2 && !isCommonWord(lowerWord) {
+				// Check if this could be a brand or model
+				if contains(specificAssetKeywords, lowerWord) {
+					hasBrand = true
+				} else if len(word) >= 3 && !isCommonWord(lowerWord) {
+					hasModel = true
+				}
+			}
+		}
+
+		// Only return true if we have both brand and model indicators
+		return hasBrand && hasModel
+	}
+
+	return false
+}
+
+// Helper function to check if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
+}
+
+// Extract the actual asset name from a query message
+func extractAssetName(message string) string {
+	// Remove common query words and phrases
+	queryWords := []string{
+		"give me info about asset", "show me", "tell me about", "what is", "find", "search for",
+		"get info about", "information about", "details about", "show", "give", "me", "info", "about",
+	}
+
+	cleanedMessage := strings.ToLower(message)
+	for _, word := range queryWords {
+		cleanedMessage = strings.ReplaceAll(cleanedMessage, strings.ToLower(word), "")
+	}
+
+	// Clean up extra spaces and trim
+	cleanedMessage = strings.TrimSpace(cleanedMessage)
+	cleanedMessage = strings.Join(strings.Fields(cleanedMessage), " ")
+
+	// If we have a meaningful asset name, return it
+	if len(cleanedMessage) > 0 && len(cleanedMessage) < 100 {
+		return cleanedMessage
+	}
+
+	// Fallback: try to extract brand/model combinations
+	words := strings.Fields(message)
+	assetWords := []string{}
+
+	for _, word := range words {
+		lowerWord := strings.ToLower(word)
+		if !isCommonWord(lowerWord) && len(word) > 2 {
+			assetWords = append(assetWords, word)
+		}
+	}
+
+	if len(assetWords) > 0 {
+		return strings.Join(assetWords, " ")
+	}
+
+	// Last resort: return the original message
+	return message
+}
+
+// Call MCP server tool
+func callMCPTool(toolName string, params map[string]interface{}) (string, error) {
+	mcpURL := "http://sams-mcp-server:8081/call/" + toolName
+
+	// Convert params to JSON
+	jsonData, err := json.Marshal(params)
 	if err != nil {
-		return nil, fmt.Errorf("failed to contact MCP server: %w", err)
+		return "", fmt.Errorf("failed to marshal params: %v", err)
+	}
+
+	// Make request to MCP server
+	resp, err := http.Post(mcpURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", fmt.Errorf("failed to call MCP server: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("MCP server returned non-200 status: %d", resp.StatusCode)
+		return "", fmt.Errorf("MCP server returned status: %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read MCP server response: %w", err)
+	// Parse response
+	var mcpResp MCPToolResponse
+	if err := json.NewDecoder(resp.Body).Decode(&mcpResp); err != nil {
+		return "", fmt.Errorf("failed to decode MCP response: %v", err)
 	}
 
-	var mcpToolsResp MCPToolsResponse
-	if err := json.Unmarshal(body, &mcpToolsResp); err != nil {
-		return nil, fmt.Errorf("failed to parse MCP tools response: %w", err)
-	}
-
-	// Convert MCP tools to Gemini's genai.Tool format
-	var geminiTools []*genai.Tool
-	functionDeclarations := []*genai.FunctionDeclaration{}
-
-	for _, t := range mcpToolsResp.Tools {
-		props := make(map[string]*genai.Schema)
-		for name, p := range t.Parameters.Properties {
-			var genaiType genai.Type
-			switch p.Type {
-			case "integer":
-				genaiType = genai.TypeInteger
-			case "number":
-				genaiType = genai.TypeNumber
-			case "boolean":
-				genaiType = genai.TypeBoolean
-			default:
-				genaiType = genai.TypeString
-			}
-			props[name] = &genai.Schema{Type: genaiType, Description: p.Description}
-		}
-
-		fd := &genai.FunctionDeclaration{
-			Name:        t.Name,
-			Description: t.Description,
-			Parameters: &genai.Schema{
-				Type:       genai.TypeObject,
-				Properties: props,
-				Required:   t.Parameters.Required,
-			},
-		}
-		functionDeclarations = append(functionDeclarations, fd)
-	}
-
-	geminiTools = append(geminiTools, &genai.Tool{FunctionDeclarations: functionDeclarations})
-	return geminiTools, nil
+	return mcpResp.Result, nil
 }
 
-// callMCPTool calls a specific tool on the MCP server.
-func callMCPTool(toolName string, params map[string]any) (map[string]any, error) {
-	requestBody, err := json.Marshal(params)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal tool params: %w", err)
+// Determine which MCP tool to use based on the message
+func determineMCPTool(message string) (string, map[string]interface{}) {
+	lowerMessage := strings.ToLower(message)
+
+	// Check for specific asset queries first (before generic patterns)
+	// If the message contains specific asset names, models, or serial numbers, use search
+	if containsSpecificAssetReference(message) {
+		assetName := extractAssetName(message)
+		return "search_assets", map[string]interface{}{"query": assetName, "limit": 10}
 	}
 
-	resp, err := http.Post(mcpServerBaseURL+"/call/"+toolName, "application/json", bytes.NewBuffer(requestBody))
-	if err != nil {
-		return nil, fmt.Errorf("failed to call tool on MCP server: %w", err)
-	}
-	defer resp.Body.Close()
+	// PRIORITY 1: Value and summary queries (highest priority)
+	if strings.Contains(lowerMessage, "total value") || strings.Contains(lowerMessage, "total cost") ||
+		strings.Contains(lowerMessage, "total worth") || strings.Contains(lowerMessage, "value of") ||
+		strings.Contains(lowerMessage, "cost of") || strings.Contains(lowerMessage, "worth of") {
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read tool response body: %w", err)
+		// If asking about specific category value, use category tool
+		if strings.Contains(lowerMessage, "it") || strings.Contains(lowerMessage, "it equipment") {
+			return "get_assets_by_category", map[string]interface{}{"category": "IT Equipment", "limit": 50}
+		}
+		if strings.Contains(lowerMessage, "vehicle") || strings.Contains(lowerMessage, "vehicles") {
+			return "get_assets_by_category", map[string]interface{}{"category": "Vehicles", "limit": 50}
+		}
+		if strings.Contains(lowerMessage, "tool") || strings.Contains(lowerMessage, "tools") {
+			return "get_assets_by_category", map[string]interface{}{"category": "Tools", "limit": 50}
+		}
+
+		// For general value queries, get all assets to calculate total
+		return "get_asset_summary", map[string]interface{}{}
 	}
 
-	// The MCP server returns {"result": "some string"}. We need to extract the string
-	// and package it correctly for Gemini.
-	var toolCallResult struct {
-		Result string `json:"result"`
+	// PRIORITY 2: Category-specific queries
+	if strings.Contains(lowerMessage, "it equipment") || (strings.Contains(lowerMessage, "it") && strings.Contains(lowerMessage, "equipment")) {
+		return "get_assets_by_category", map[string]interface{}{"category": "IT Equipment", "limit": 20}
 	}
-	if err := json.Unmarshal(body, &toolCallResult); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal tool result from MCP: %w", err)
+	if strings.Contains(lowerMessage, "vehicle") || strings.Contains(lowerMessage, "vehicles") {
+		return "get_assets_by_category", map[string]interface{}{"category": "Vehicles", "limit": 20}
+	}
+	if strings.Contains(lowerMessage, "tool") || strings.Contains(lowerMessage, "tools") {
+		return "get_assets_by_category", map[string]interface{}{"category": "Tools", "limit": 20}
 	}
 
-	// Gemini expects a map[string]any as the result, so we wrap it.
-	resultForGemini := map[string]any{"output": toolCallResult.Result}
-	return resultForGemini, nil
+	// PRIORITY 3: Asset summary and overview queries
+	if strings.Contains(lowerMessage, "summary") || strings.Contains(lowerMessage, "overview") ||
+		strings.Contains(lowerMessage, "count") || strings.Contains(lowerMessage, "how many") {
+		return "get_asset_summary", map[string]interface{}{}
+	}
+
+	// PRIORITY 4: Status-based queries
+	if strings.Contains(lowerMessage, "active") {
+		return "get_assets_by_status", map[string]interface{}{"status": "active", "limit": 20}
+	}
+	if strings.Contains(lowerMessage, "maintenance") {
+		return "get_assets_by_status", map[string]interface{}{"status": "maintenance", "limit": 20}
+	}
+
+	// PRIORITY 5: Location-based queries
+	if strings.Contains(lowerMessage, "location") || strings.Contains(lowerMessage, "address") ||
+		strings.Contains(lowerMessage, "building") || strings.Contains(lowerMessage, "room") ||
+		strings.Contains(lowerMessage, "jakarta") || strings.Contains(lowerMessage, "office") ||
+		strings.Contains(lowerMessage, "where") || strings.Contains(lowerMessage, "place") {
+		// Extract location query from the message
+		locationQuery := message
+		if strings.Contains(lowerMessage, "jakarta") {
+			locationQuery = "Jakarta"
+		} else if strings.Contains(lowerMessage, "office") {
+			locationQuery = "Office"
+		} else if strings.Contains(lowerMessage, "building") {
+			locationQuery = "Building"
+		} else if strings.Contains(lowerMessage, "room") {
+			locationQuery = "Room"
+		}
+		return "get_assets_by_location", map[string]interface{}{"location_query": locationQuery, "limit": 20}
+	}
+
+	// PRIORITY 6: Generic search queries (lowest priority)
+	if strings.Contains(lowerMessage, "search") || strings.Contains(lowerMessage, "find") ||
+		strings.Contains(lowerMessage, "computer") {
+		// Extract search query
+		query := message
+		if strings.Contains(lowerMessage, "laptop") {
+			query = "laptop"
+		} else if strings.Contains(lowerMessage, "computer") {
+			query = "computer"
+		}
+		return "search_assets", map[string]interface{}{"query": query, "limit": 10}
+	}
+
+	// Default to asset summary
+	return "get_asset_summary", map[string]interface{}{}
 }
 
-// HandleAIChat is the main handler for the AI chat functionality.
-func HandleAIChat(c *fiber.Ctx) error {
-	log.Println("HandleAIChat: received new request")
+// HandleAIQuery is the main handler for the AI chat functionality.
+func HandleAIQuery(c *fiber.Ctx) error {
+	log.Println("HandleAIQuery: received new request")
 	var req AIChatRequest
 	if err := c.BodyParser(&req); err != nil {
-		log.Printf("HandleAIChat: error parsing request body: %v\n", err)
+		log.Printf("HandleAIQuery: error parsing request body: %v\n", err)
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Cannot parse request body",
 		})
 	}
 
+	// FORCE GEMINI TO USE TOOLS: Always use Gemini but with tool knowledge
+	log.Printf("HandleAIQuery: FORCE GEMINI TOOL MODE - instructing Gemini to use MCP tools for: %s", req.Message)
+
+	// Determine which MCP tool to use
+	toolName, params := determineMCPTool(req.Message)
+
+	// Call MCP server to get actual data
+	mcpResult, err := callMCPTool(toolName, params)
+	if err != nil {
+		log.Printf("HandleAIQuery: MCP tool call failed: %v", err)
+		// Continue to Gemini with tool information even if MCP fails
+		mcpResult = "Tool call failed: " + err.Error()
+	}
+
+	// Now send to Gemini with tool data and instructions to use it
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
+	log.Printf("HandleAIQuery: GEMINI_API_KEY value: %s", apiKey)
 	if apiKey == "" {
-		log.Println("HandleAIChat: GEMINI_API_KEY not set")
+		log.Println("HandleAIQuery: GEMINI_API_KEY not set")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "GEMINI_API_KEY is not set"})
 	}
 
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		log.Printf("HandleAIChat: failed to create genai client: %v\n", err)
+		log.Printf("HandleAIQuery: failed to create genai client: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create AI client"})
 	}
 	defer client.Close()
 
-	log.Println("HandleAIChat: fetching tools from MCP server")
-	mcpTools, err := getToolsFromMCP()
-	if err != nil {
-		log.Printf("HandleAIChat: failed to get tools from MCP: %v\n", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get tools from MCP server"})
-	}
-	log.Printf("HandleAIChat: successfully fetched %d tools from MCP server", len(mcpTools))
-
 	model := client.GenerativeModel("gemini-1.5-pro-latest")
-	if len(mcpTools) > 0 {
-		model.Tools = mcpTools
-	}
-
 	cs := model.StartChat()
 
-	log.Printf("HandleAIChat: sending prompt to Gemini: %s", req.Message)
-	resp, err := cs.SendMessage(ctx, genai.Text(req.Message))
+	// Enhanced prompt that forces Gemini to use tool data
+	enhancedPrompt := fmt.Sprintf(`You are a SAMS (Smart Asset Management System) AI Assistant. 
+
+IMPORTANT: You MUST use the provided tool data to answer questions. Do NOT make up information.
+
+User Query: %s
+
+Available MCP Tool: %s
+Tool Parameters: %v
+
+Tool Result Data:
+%s
+
+INSTRUCTIONS:
+1. Use ONLY the tool data above to answer the user's question
+2. If the tool data is empty or failed, explain what you tried to do and suggest rephrasing
+3. Format your response clearly and professionally
+4. Do NOT invent or assume any asset information not provided by the tools
+5. If the user asks about assets, you MUST use the tool data to provide accurate information
+
+Remember: You are a tool-powered AI. Your knowledge comes from the MCP tools, not from general knowledge.`,
+		req.Message, toolName, params, mcpResult)
+
+	log.Printf("HandleAIQuery: sending tool-enhanced prompt to Gemini: %s", enhancedPrompt)
+	resp, err := cs.SendMessage(ctx, genai.Text(enhancedPrompt))
 	if err != nil {
-		log.Printf("HandleAIChat: failed to send message to Gemini: %v\n", err)
+		log.Printf("HandleAIQuery: failed to send message to Gemini: %v\n", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get response from AI model"})
 	}
-	log.Println("HandleAIChat: successfully received response from Gemini")
+	log.Println("HandleAIQuery: successfully received response from Gemini")
 
 	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		log.Println("HandleAIChat: Gemini response has no content")
+		log.Println("HandleAIQuery: Gemini response has no content")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "AI model returned empty response"})
-	}
-
-	// Check if the model wants to call a tool
-	if toolCalls := resp.Candidates[0].Content.Parts; len(toolCalls) > 0 {
-		if tc, ok := toolCalls[0].(genai.ToolCall); ok {
-			log.Printf("HandleAIChat: Gemini wants to call tool: %s", tc.Name)
-			toolResult, err := callMCPTool(tc.Name, tc.Args)
-			if err != nil {
-				log.Printf("HandleAIChat: error calling MCP tool %s: %v", tc.Name, err)
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to execute tool"})
-			}
-			log.Printf("HandleAIChat: successfully called tool %s, got result", tc.Name)
-
-			// Send the tool result back to the model
-			resp, err = cs.SendMessage(ctx, genai.ToolResponse{
-				Name:    tc.Name,
-				Content: toolResult,
-			})
-			if err != nil {
-				log.Printf("HandleAIChat: error sending tool response to Gemini: %v", err)
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to send tool response to AI model"})
-			}
-			log.Println("HandleAIChat: successfully sent tool response to Gemini and got final answer")
-		}
 	}
 
 	// Extract and send the final text response
 	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
 		if finalResponse, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-			log.Printf("HandleAIChat: sending final response to client: %s", finalResponse)
+			log.Printf("HandleAIQuery: sending final Gemini response to client: %s", string(finalResponse))
 			return c.JSON(AIChatResponse{Response: string(finalResponse)})
 		}
 	}
 
-	log.Println("HandleAIChat: could not extract final text response from Gemini")
+	log.Println("HandleAIQuery: could not extract final text response from Gemini")
 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Could not extract final response from AI model"})
+}
+
+// Generate a helpful response when tools fail, encouraging tool usage
+func generateToolFocusedResponse(message string, attemptedTool string, err error) string {
+	// Provide helpful guidance based on the attempted tool
+	switch attemptedTool {
+	case "search_assets":
+		return `I tried to search for assets but encountered an issue. Here are some ways to query your assets:
+
+**Available Asset Queries:**
+• Search by name: "Samsung Galaxy Tab S7", "Lenovo ThinkPad X1"
+• Search by category: "IT Equipment", "Vehicles", "Tools"
+• Search by status: "Active assets", "Maintenance assets"
+• Search by location: "Assets in Jakarta", "Office assets"
+• Get summaries: "Asset summary", "Total value"
+
+**Try rephrasing your query** to be more specific about what you want to know about your assets.`
+
+	case "get_asset_summary":
+		return `I tried to get asset summary information but encountered an issue. 
+
+**Available Summary Queries:**
+• "Show me total assets and value"
+• "Asset overview"
+• "How many assets do we have?"
+• "Total asset count"
+
+**Try asking for specific asset information** or rephrase your summary request.`
+
+	case "get_assets_by_location":
+		return `I tried to find assets by location but encountered an issue.
+
+**Available Location Queries:**
+• "Assets in Jakarta"
+• "Show me office assets"
+• "Building assets"
+• "Room 101 assets"
+
+**Try being more specific** about the location you're interested in.`
+
+	default:
+		return `I tried to use asset management tools but encountered an issue. 
+
+**What I can help you with:**
+• **Asset Information**: Search for specific assets by name, model, or serial number
+• **Asset Categories**: Find assets by type (IT Equipment, Vehicles, Tools)
+• **Asset Status**: Find active, maintenance, or disposed assets
+• **Asset Location**: Find assets by location, building, or room
+• **Asset Summaries**: Get total counts, values, and overviews
+
+**Try asking about your assets** in a specific way, such as:
+• "Show me laptop assets"
+• "Find Canon camera"
+• "Assets in Jakarta"
+• "Total asset value"`
+
+	}
 }

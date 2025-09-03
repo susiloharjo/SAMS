@@ -59,8 +59,8 @@ export default function AssetDetailPage() {
   const fetchRelatedData = async () => {
     try {
       const [categoriesRes, departmentsRes] = await Promise.all([
-        fetch('http://localhost:8080/api/v1/categories'),
-        fetch('http://localhost:8080/api/v1/departments'),
+              fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`),
+      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments`),
       ]);
       
       const categoriesData = await categoriesRes.json();
@@ -76,7 +76,7 @@ export default function AssetDetailPage() {
   const fetchAsset = async (id: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`http://localhost:8080/api/v1/assets/${id}`);
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/${id}`);
       if (!response.ok) {
         throw new Error('Failed to fetch asset');
       }
@@ -138,7 +138,7 @@ export default function AssetDetailPage() {
     if (!asset) return;
     
     try {
-      const response = await fetch(`http://localhost:8080/api/v1/assets/${asset.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/${asset.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -388,7 +388,7 @@ export default function AssetDetailPage() {
                 <button
                   onClick={() => {
                     if (window.confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
-                      fetch(`http://localhost:8080/api/v1/assets/${asset.id}`, {
+                      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/${asset.id}`, {
                         method: 'DELETE',
                       }).then(response => {
                         if (response.ok) {

@@ -14,9 +14,12 @@ import (
 )
 
 func main() {
-	// Load environment variables
-	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found, using system environment variables")
+	// Load environment variables from root directory
+	if err := godotenv.Load("../.env"); err != nil {
+		log.Println("No root .env file found, trying current directory")
+		if err := godotenv.Load(); err != nil {
+			log.Println("No .env file found, using system environment variables")
+		}
 	}
 
 	// Initialize database
@@ -91,7 +94,7 @@ func main() {
 	app.Delete("/api/v1/assets/:id", handlers.DeleteAsset)
 	app.Get("/api/v1/assets/:id/qr", handlers.GenerateAssetQR)
 
-	app.Post("/api/v1/ai/chat", handlers.HandleAIChat)
+	app.Post("/api/v1/ai/query", handlers.HandleAIQuery)
 
 	// Start server
 	port := os.Getenv("SERVER_PORT")
