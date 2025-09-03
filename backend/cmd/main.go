@@ -91,7 +91,7 @@ func main() {
 	app.Delete("/api/v1/assets/:id", handlers.DeleteAsset)
 	app.Get("/api/v1/assets/:id/qr", handlers.GenerateAssetQR)
 
-	app.Post("/api/v1/ai/query", handlers.HandleAIQuery)
+	app.Post("/api/v1/ai/chat", handlers.HandleAIChat)
 
 	// Start server
 	port := os.Getenv("SERVER_PORT")

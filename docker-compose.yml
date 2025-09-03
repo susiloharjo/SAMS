@@ -67,9 +67,9 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_GOOGLE_MAPS_API_KEY: ${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-        NEXT_PUBLIC_ENVIRONMENT: ${NEXT_PUBLIC_ENVIRONMENT}
+        - NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - NEXT_PUBLIC_ENVIRONMENT=${NEXT_PUBLIC_ENVIRONMENT}
     container_name: sams-frontend
     ports:
       - "3000:3000"
@@ -81,6 +81,21 @@ services:
       - sams-backend
     restart: unless-stopped
 
+  sams-mcp-server:
+    container_name: sams-mcp-server
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    networks:
+      - sams-network
+    depends_on:
+      - sams-backend
+
 volumes:
   postgres_data:
   pgadmin_data:
+
+networks:
+  sams-network:

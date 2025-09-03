@@ -4,184 +4,197 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-	"strings"
+	"os"
 
 	"github.com/gofiber/fiber/v2"
-	"gorm.io/gorm"
-
-	"sams-backend/internal/database"
-	"sams-backend/internal/models"
+	"github.com/google/generative-ai-go/genai"
+	"google.golang.org/api/option"
 )
 
-// AIQueryRequest represents the request body for AI queries
-type AIQueryRequest struct {
-	Query string `json:"query"`
-}
+// Constants
+const (
+	mcpServerBaseURL = "http://sams-mcp-server:8081"
+)
 
-// GeminiRequest represents the request to Gemini API
+// Structs for Gemini API
 type GeminiRequest struct {
-	Contents []GeminiContent `json:"contents"`
+	Prompt string `json:"prompt"`
 }
 
-// GeminiContent represents content for Gemini API
-type GeminiContent struct {
-	Parts []GeminiPart `json:"parts"`
+// Struct for MCP Tool Schemas
+type MCPToolProperty struct {
+	Type        string `json:"type"`
+	Description string `json:"description"`
 }
 
-// GeminiPart represents a part of content for Gemini API
-type GeminiPart struct {
-	Text string `json:"text"`
+type MCPToolParameters struct {
+	Type       string                     `json:"type"`
+	Properties map[string]MCPToolProperty `json:"properties"`
+	Required   []string                   `json:"required"`
 }
 
-// GeminiResponse represents the response from Gemini API
-type GeminiResponse struct {
-	Candidates []GeminiCandidate `json:"candidates"`
+type MCPTool struct {
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Parameters  MCPToolParameters `json:"parameters"`
 }
 
-// GeminiCandidate represents a candidate response from Gemini API
-type GeminiCandidate struct {
-	Content GeminiContent `json:"content"`
+type MCPToolsResponse struct {
+	Tools []MCPTool `json:"tools"`
 }
 
-func HandleAIQuery(c *fiber.Ctx) error {
-	db := database.GetDB()
-	var request AIQueryRequest
-	if err := c.BodyParser(&request); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": true, "message": "Invalid request body"})
-	}
-
-	if request.Query == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": true, "message": "Query is required"})
-	}
-
-	// 1. Get relevant assets from the database
-	assets, err := getRelevantAssets(db, request.Query)
+// getToolsFromMCP fetches tool definitions from the MCP server.
+func getToolsFromMCP() ([]*genai.Tool, error) {
+	resp, err := http.Get(mcpServerBaseURL + "/tools")
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": true, "message": "Failed to retrieve asset context"})
-	}
-
-	// 2. Prepare context for Gemini
-	context := prepareAssetContext(assets)
-
-	// 3. Call Gemini API
-	response, err := callGeminiAPI(request.Query, context)
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": true, "message": err.Error()})
-	}
-
-	return c.JSON(fiber.Map{"error": false, "data": response})
-}
-
-// getRelevantAssets fetches assets relevant to the query
-func getRelevantAssets(db *gorm.DB, query string) ([]models.AssetSummary, error) {
-	var assets []models.AssetSummary
-
-	// Simple keyword-based filtering for MVP
-	query = strings.ToLower(query)
-
-	baseQuery := db.Table("asset_summary")
-
-	if strings.Contains(query, "it") || strings.Contains(query, "computer") || strings.Contains(query, "laptop") {
-		baseQuery = baseQuery.Where("category_name ILIKE ?", "%IT%")
-	} else if strings.Contains(query, "vehicle") || strings.Contains(query, "car") || strings.Contains(query, "van") {
-		baseQuery = baseQuery.Where("category_name ILIKE ?", "%Vehicle%")
-	} else if strings.Contains(query, "building") || strings.Contains(query, "office") {
-		baseQuery = baseQuery.Where("category_name ILIKE ?", "%Building%")
-	} else if strings.Contains(query, "machinery") || strings.Contains(query, "equipment") {
-		baseQuery = baseQuery.Where("category_name ILIKE ?", "%Machinery%")
-	}
-
-	if strings.Contains(query, "active") || strings.Contains(query, "working") {
-		baseQuery = baseQuery.Where("status = ?", "active")
-	} else if strings.Contains(query, "maintenance") {
-		baseQuery = baseQuery.Where("status = ?", "maintenance")
-	}
-
-	if strings.Contains(query, "high") || strings.Contains(query, "critical") {
-		baseQuery = baseQuery.Where("criticality IN ?", []string{"high", "critical"})
-	}
-
-	// Limit results for context
-	if err := baseQuery.Limit(10).Find(&assets).Error; err != nil {
-		return nil, err
-	}
-
-	// If no specific filtering, get a sample of assets
-	if len(assets) == 0 {
-		if err := db.Table("asset_summary").Limit(5).Find(&assets).Error; err != nil {
-			return nil, err
-		}
-	}
-
-	return assets, nil
-}
-
-// prepareAssetContext prepares asset data context for AI
-func prepareAssetContext(assets []models.AssetSummary) string {
-	if len(assets) == 0 {
-		return "No specific asset data available for this query."
-	}
-
-	var context strings.Builder
-	context.WriteString(fmt.Sprintf("Found %d relevant assets:\n\n", len(assets)))
-
-	for i, asset := range assets {
-		context.WriteString(fmt.Sprintf("Asset %d:\n", i+1))
-		context.WriteString(fmt.Sprintf("- Name: %s\n", asset.Name))
-		context.WriteString(fmt.Sprintf("- Category: %s\n", asset.CategoryName))
-		context.WriteString(fmt.Sprintf("- Type: %s\n", asset.Type))
-		context.WriteString(fmt.Sprintf("- Status: %s\n", asset.Status))
-		context.WriteString(fmt.Sprintf("- Condition: %s\n", asset.Condition))
-		context.WriteString(fmt.Sprintf("- Criticality: %s\n", asset.Criticality))
-		context.WriteString(fmt.Sprintf("- Location: %s\n", asset.Address))
-		if asset.Latitude != nil && asset.Longitude != nil {
-			context.WriteString(fmt.Sprintf("- Coordinates: %.6f, %.6f\n", *asset.Latitude, *asset.Longitude))
-		}
-		context.WriteString(fmt.Sprintf("- Current Value: $%.2f\n", asset.CurrentValue))
-		context.WriteString("\n")
-	}
-
-	return context.String()
-}
-
-// callGeminiAPI calls the Gemini API with the given prompt
-func callGeminiAPI(apiKey, prompt string) (string, error) {
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=%s", apiKey)
-
-	requestBody := GeminiRequest{
-		Contents: []GeminiContent{
-			{
-				Parts: []GeminiPart{
-					{Text: prompt},
-				},
-			},
-		},
-	}
-
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return "", err
-	}
-
-	resp, err := http.Post(url, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("failed to contact MCP server: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("Gemini API returned status: %d", resp.StatusCode)
+		return nil, fmt.Errorf("MCP server returned non-200 status: %d", resp.StatusCode)
 	}
 
-	var geminiResp GeminiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&geminiResp); err != nil {
-		return "", err
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read MCP server response: %w", err)
 	}
 
-	if len(geminiResp.Candidates) == 0 || len(geminiResp.Candidates[0].Content.Parts) == 0 {
-		return "No response generated from AI.", nil
+	var mcpToolsResp MCPToolsResponse
+	if err := json.Unmarshal(body, &mcpToolsResp); err != nil {
+		return nil, fmt.Errorf("failed to parse MCP tools response: %w", err)
 	}
 
-	return geminiResp.Candidates[0].Content.Parts[0].Text, nil
+	// Convert MCP tools to Gemini's genai.Tool format
+	var geminiTools []*genai.Tool
+	functionDeclarations := []*genai.FunctionDeclaration{}
+
+	for _, t := range mcpToolsResp.Tools {
+		props := make(map[string]*genai.Schema)
+		for name, p := range t.Parameters.Properties {
+			var genaiType genai.Type
+			switch p.Type {
+			case "integer":
+				genaiType = genai.TypeInteger
+			case "number":
+				genaiType = genai.TypeNumber
+			case "boolean":
+				genaiType = genai.TypeBoolean
+			default:
+				genaiType = genai.TypeString
+			}
+			props[name] = &genai.Schema{Type: genaiType, Description: p.Description}
+		}
+
+		fd := &genai.FunctionDeclaration{
+			Name:        t.Name,
+			Description: t.Description,
+			Parameters: &genai.Schema{
+				Type:       genai.TypeObject,
+				Properties: props,
+				Required:   t.Parameters.Required,
+			},
+		}
+		functionDeclarations = append(functionDeclarations, fd)
+	}
+
+	geminiTools = append(geminiTools, &genai.Tool{FunctionDeclarations: functionDeclarations})
+	return geminiTools, nil
+}
+
+// callMCPTool calls a specific tool on the MCP server.
+func callMCPTool(toolName string, params map[string]any) (map[string]any, error) {
+	requestBody, err := json.Marshal(params)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal tool params: %w", err)
+	}
+
+	resp, err := http.Post(mcpServerBaseURL+"/call/"+toolName, "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, fmt.Errorf("failed to call tool on MCP server: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read tool response body: %w", err)
+	}
+
+	// The MCP server returns {"result": "some string"}. We need to extract the string
+	// and package it correctly for Gemini.
+	var toolCallResult struct {
+		Result string `json:"result"`
+	}
+	if err := json.Unmarshal(body, &toolCallResult); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal tool result from MCP: %w", err)
+	}
+
+	// Gemini expects a map[string]any as the result, so we wrap it.
+	resultForGemini := map[string]any{"output": toolCallResult.Result}
+	return resultForGemini, nil
+}
+
+// HandleAIChat is the main handler for the AI chat functionality.
+func HandleAIChat(c *fiber.Ctx) error {
+	apiKey := os.Getenv("GEMINI_API_KEY")
+	if apiKey == "" {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "GEMINI_API_KEY is not set"})
+	}
+
+	var req GeminiRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse request"})
+	}
+
+	ctx := c.Context()
+	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create Gemini client", "details": err.Error()})
+	}
+	defer client.Close()
+
+	tools, err := getToolsFromMCP()
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get tools from MCP server", "details": err.Error()})
+	}
+
+	model := client.GenerativeModel("gemini-1.5-flash")
+	model.Tools = tools
+
+	session := model.StartChat()
+	resp, err := session.SendMessage(ctx, genai.Text(req.Prompt))
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to send message to Gemini", "details": err.Error()})
+	}
+
+	// Handle tool calls if any
+	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
+		if fc := resp.Candidates[0].Content.Parts[0].(genai.FunctionCall); fc.Name != "" {
+
+			toolResult, err := callMCPTool(fc.Name, fc.Args)
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to execute tool", "details": err.Error()})
+			}
+
+			// Send the tool result back to Gemini
+			resp, err = session.SendMessage(ctx, genai.FunctionResponse{
+				Name:     fc.Name,
+				Response: toolResult,
+			})
+			if err != nil {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to send tool response to Gemini", "details": err.Error()})
+			}
+		}
+	}
+
+	// Extract and send the final text response
+	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
+		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
+			return c.JSON(fiber.Map{"response": text})
+		}
+	}
+
+	return c.JSON(fiber.Map{"response": "No content received from AI."})
 }
