@@ -2,9 +2,11 @@ package handlers
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 
@@ -18,9 +20,13 @@ const (
 	mcpServerBaseURL = "http://sams-mcp-server:8081"
 )
 
-// Structs for Gemini API
-type GeminiRequest struct {
-	Prompt string `json:"prompt"`
+// Structs for AI Chat
+type AIChatRequest struct {
+	Message string `json:"message"`
+}
+
+type AIChatResponse struct {
+	Response string `json:"response"`
 }
 
 // Struct for MCP Tool Schemas
@@ -138,63 +144,89 @@ func callMCPTool(toolName string, params map[string]any) (map[string]any, error)
 
 // HandleAIChat is the main handler for the AI chat functionality.
 func HandleAIChat(c *fiber.Ctx) error {
+	log.Println("HandleAIChat: received new request")
+	var req AIChatRequest
+	if err := c.BodyParser(&req); err != nil {
+		log.Printf("HandleAIChat: error parsing request body: %v\n", err)
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Cannot parse request body",
+		})
+	}
+
+	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
+		log.Println("HandleAIChat: GEMINI_API_KEY not set")
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "GEMINI_API_KEY is not set"})
 	}
 
-	var req GeminiRequest
-	if err := c.BodyParser(&req); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Cannot parse request"})
-	}
-
-	ctx := c.Context()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create Gemini client", "details": err.Error()})
+		log.Printf("HandleAIChat: failed to create genai client: %v\n", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to create AI client"})
 	}
 	defer client.Close()
 
-	tools, err := getToolsFromMCP()
+	log.Println("HandleAIChat: fetching tools from MCP server")
+	mcpTools, err := getToolsFromMCP()
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get tools from MCP server", "details": err.Error()})
+		log.Printf("HandleAIChat: failed to get tools from MCP: %v\n", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get tools from MCP server"})
+	}
+	log.Printf("HandleAIChat: successfully fetched %d tools from MCP server", len(mcpTools))
+
+	model := client.GenerativeModel("gemini-1.5-pro-latest")
+	if len(mcpTools) > 0 {
+		model.Tools = mcpTools
 	}
 
-	model := client.GenerativeModel("gemini-1.5-flash")
-	model.Tools = tools
+	cs := model.StartChat()
 
-	session := model.StartChat()
-	resp, err := session.SendMessage(ctx, genai.Text(req.Prompt))
+	log.Printf("HandleAIChat: sending prompt to Gemini: %s", req.Message)
+	resp, err := cs.SendMessage(ctx, genai.Text(req.Message))
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to send message to Gemini", "details": err.Error()})
+		log.Printf("HandleAIChat: failed to send message to Gemini: %v\n", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to get response from AI model"})
+	}
+	log.Println("HandleAIChat: successfully received response from Gemini")
+
+	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
+		log.Println("HandleAIChat: Gemini response has no content")
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "AI model returned empty response"})
 	}
 
-	// Handle tool calls if any
-	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
-		if fc := resp.Candidates[0].Content.Parts[0].(genai.FunctionCall); fc.Name != "" {
-
-			toolResult, err := callMCPTool(fc.Name, fc.Args)
+	// Check if the model wants to call a tool
+	if toolCalls := resp.Candidates[0].Content.Parts; len(toolCalls) > 0 {
+		if tc, ok := toolCalls[0].(genai.ToolCall); ok {
+			log.Printf("HandleAIChat: Gemini wants to call tool: %s", tc.Name)
+			toolResult, err := callMCPTool(tc.Name, tc.Args)
 			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to execute tool", "details": err.Error()})
+				log.Printf("HandleAIChat: error calling MCP tool %s: %v", tc.Name, err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to execute tool"})
 			}
+			log.Printf("HandleAIChat: successfully called tool %s, got result", tc.Name)
 
-			// Send the tool result back to Gemini
-			resp, err = session.SendMessage(ctx, genai.FunctionResponse{
-				Name:     fc.Name,
-				Response: toolResult,
+			// Send the tool result back to the model
+			resp, err = cs.SendMessage(ctx, genai.ToolResponse{
+				Name:    tc.Name,
+				Content: toolResult,
 			})
 			if err != nil {
-				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to send tool response to Gemini", "details": err.Error()})
+				log.Printf("HandleAIChat: error sending tool response to Gemini: %v", err)
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to send tool response to AI model"})
 			}
+			log.Println("HandleAIChat: successfully sent tool response to Gemini and got final answer")
 		}
 	}
 
 	// Extract and send the final text response
 	if len(resp.Candidates) > 0 && len(resp.Candidates[0].Content.Parts) > 0 {
-		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-			return c.JSON(fiber.Map{"response": text})
+		if finalResponse, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
+			log.Printf("HandleAIChat: sending final response to client: %s", finalResponse)
+			return c.JSON(AIChatResponse{Response: string(finalResponse)})
 		}
 	}
 
-	return c.JSON(fiber.Map{"response": "No content received from AI."})
+	log.Println("HandleAIChat: could not extract final text response from Gemini")
+	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Could not extract final response from AI model"})
 }
