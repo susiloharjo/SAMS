@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  sams-postgres:
+    image: postgres:15-alpine
+    container_name: sams-postgres
+    environment:
+      POSTGRES_DB: sams_db
+      POSTGRES_USER: sams_user
+      POSTGRES_PASSWORD: sams_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    restart: unless-stopped
+
+  # Redis Cache
+  sams-redis:
+    image: redis:7-alpine
+    container_name: sams-redis
+    ports:
+      - "6380:6379"
+    restart: unless-stopped
+
+  # pgAdmin (Database Management)
+  sams-pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sams-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@sams.com
+      PGADMIN_DEFAULT_PASSWORD: admin123
+    ports:
+      - "5051:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - sams-postgres
+    restart: unless-stopped
+
+  # SAMS Backend
+  sams-backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sams-backend
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=8080
+      - DB_HOST=sams-postgres
+      - DB_PORT=5432
+      - DB_NAME=sams_db
+      - DB_USER=sams_user
+      - DB_PASSWORD=sams_password
+      - REDIS_HOST=sams-redis
+      - REDIS_PORT=6379
+    depends_on:
+      - sams-postgres
+      - sams-redis
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  pgadmin_data:

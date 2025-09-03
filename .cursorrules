@@ -1,0 +1,273 @@
+# SAMS: Smart Asset Management System - AI Development Rules
+
+## Project Overview
+SAMS is a comprehensive web-based Asset Management System designed to manage the tracking, organization, and querying of various assets, including fixed assets (e.g., IT equipment, vehicles, machinery) and non-fixed assets (e.g., land, buildings).
+
+## Technology Stack & Architecture
+
+### Frontend
+- **Framework**: Next.js (React) with TypeScript
+- **Styling**: Tailwind CSS for responsive, modern UI
+- **State Management**: Zustand or React Query
+- **UI Components**: Modern, accessible components with Fiori-inspired patterns
+- **Calendar**: FullCalendar for maintenance scheduling
+
+### Backend
+- **Language**: Go (Golang)
+- **Framework**: Fiber or Echo for fast, lightweight RESTful APIs
+- **Authentication**: JWT-based with optional multi-factor support
+- **ORM**: GORM for PostgreSQL operations
+
+### Database & Storage
+- **Primary Database**: PostgreSQL for relational data (assets, users, logs)
+- **Vector Database**: Qdrant for vector-based search and AI-driven queries
+- **Document Storage**: Cloud storage (AWS S3 or MinIO) for secure file handling
+- **Caching**: Redis for performance optimization
+
+### AI Integration
+- **Primary AI**: Google Gemini API for natural language processing
+- **Framework**: LangChain for query chaining and context management
+- **Vector Search**: Qdrant for similarity-based asset/document retrieval
+- **Use Cases**: Natural language queries, AI-powered recommendations, report summarization
+
+### Infrastructure
+- **Containerization**: Docker with Docker Compose for development
+- **Orchestration**: Kubernetes (optional) or Docker Swarm
+- **Cloud**: AWS, GCP, or Vercel for frontend hosting
+- **CI/CD**: Automated testing and deployment pipelines
+
+## Development Principles
+
+### Code Quality
+- Write clean, readable, and maintainable code
+- Follow Go and React best practices
+- Implement comprehensive error handling
+- Use TypeScript for type safety in frontend
+- Write unit tests for all critical functions
+
+### Security
+- Implement RBAC (Role-Based Access Control)
+- Use HTTPS and secure communication
+- Sanitize all user inputs
+- Encrypt sensitive data
+- Implement audit trails for compliance
+
+### Performance
+- Optimize database queries and indexing
+- Implement caching strategies
+- Use efficient algorithms for AI processing
+- Monitor and optimize response times
+- Implement lazy loading and pagination
+
+### Scalability
+- Design for horizontal scaling
+- Use microservices architecture
+- Implement proper separation of concerns
+- Plan for future growth and load increases
+
+## Key Features to Implement
+
+### Core Modules
+1. **Asset Registry**: Centralized asset management with bulk import/export
+2. **QR/Barcode System**: Generation and scanning capabilities
+3. **Lifecycle Management**: Asset tracking from acquisition to disposal
+4. **Location Tracking**: Hierarchical location management with GPS integration
+5. **Maintenance Management**: Scheduling and tracking with automated reminders
+6. **Document Management**: Secure storage with version control
+7. **Reporting & Analytics**: Dashboard and exportable reports
+8. **User Management**: RBAC with granular permissions
+9. **Audit Trail**: Compliance logging for ISO/SOX standards
+10. **AI Assistant**: Natural language queries and smart recommendations
+
+### AI-Powered Features
+- Natural language asset queries
+- Intelligent maintenance scheduling
+- Automated report summarization
+- Smart asset recommendations
+- Predictive analytics for asset lifecycle
+
+## Development Guidelines
+
+### API Design
+- RESTful API design principles
+- Consistent error handling and status codes
+- Comprehensive API documentation
+- Version control for API endpoints
+- Rate limiting and security measures
+
+### Database Design
+- Normalized schema design
+- Proper indexing for performance
+- Foreign key constraints for data integrity
+- Audit fields (created_at, updated_at, created_by)
+- Soft deletes where appropriate
+
+### Frontend Architecture
+- Component-based architecture
+- Responsive design for mobile support
+- Accessibility compliance (WCAG)
+- Progressive enhancement
+- Performance optimization (lazy loading, code splitting)
+
+### Testing Strategy
+- Unit tests for backend functions
+- Integration tests for API endpoints
+- End-to-end tests with Playwright
+- Performance testing for critical paths
+- Security testing for vulnerabilities
+
+## File Organization
+
+### Backend Structure
+```
+backend/
+├── cmd/           # Application entry points
+├── internal/      # Private application code
+├── pkg/          # Public libraries
+├── api/          # API definitions and handlers
+├── models/       # Data models and database schemas
+├── services/     # Business logic
+├── middleware/   # HTTP middleware
+└── tests/        # Test files
+```
+
+### Frontend Structure
+```
+frontend/
+├── components/   # Reusable UI components
+├── pages/        # Next.js pages
+├── hooks/        # Custom React hooks
+├── services/     # API service functions
+├── types/        # TypeScript type definitions
+├── utils/        # Utility functions
+└── styles/       # Global styles and Tailwind config
+```
+
+## Naming Conventions
+
+### Go (Backend)
+- Use camelCase for variables and functions
+- Use PascalCase for exported types and functions
+- Use snake_case for database fields
+- Use descriptive names that explain purpose
+
+### TypeScript/React (Frontend)
+- Use camelCase for variables and functions
+- Use PascalCase for components and types
+- Use kebab-case for CSS classes
+- Use descriptive names that explain purpose
+
+## Performance Considerations
+
+### Backend
+- Implement connection pooling for databases
+- Use goroutines for concurrent operations
+- Implement proper caching strategies
+- Monitor memory usage and garbage collection
+- Use efficient JSON serialization
+
+### Frontend
+- Implement code splitting and lazy loading
+- Optimize bundle size and tree shaking
+- Use React.memo for expensive components
+- Implement virtual scrolling for large lists
+- Optimize images and assets
+
+## Security Requirements
+
+### Authentication & Authorization
+- JWT token management
+- Role-based access control (RBAC)
+- Session management
+- Multi-factor authentication support
+- Secure password policies
+
+### Data Protection
+- Encrypt sensitive data at rest
+- Use HTTPS for all communications
+- Implement input validation and sanitization
+- Protect against SQL injection and XSS
+- Regular security audits and updates
+
+## Compliance & Standards
+
+### Audit Requirements
+- Complete audit trail for all user actions
+- Immutable log records
+- Exportable audit logs
+- Compliance with ISO and SOX standards
+- Data retention policies
+
+### Data Privacy
+- GDPR compliance considerations
+- Data anonymization where appropriate
+- User consent management
+- Data portability and deletion rights
+- Privacy by design principles
+
+## Monitoring & Observability
+
+### Logging
+- Structured logging with consistent format
+- Log levels (DEBUG, INFO, WARN, ERROR)
+- Centralized log aggregation
+- Log rotation and retention policies
+
+### Metrics
+- Application performance metrics
+- Business metrics (asset counts, user activity)
+- Infrastructure metrics (CPU, memory, disk)
+- Custom metrics for business KPIs
+
+### Alerting
+- Proactive monitoring for critical issues
+- Performance degradation alerts
+- Security incident notifications
+- Business metric alerts
+
+## Deployment & DevOps
+
+### Environment Management
+- Development, staging, and production environments
+- Environment-specific configuration
+- Secrets management
+- Infrastructure as code
+
+### CI/CD Pipeline
+- Automated testing on all commits
+- Code quality checks and linting
+- Security scanning and vulnerability assessment
+- Automated deployment to staging
+- Manual approval for production deployment
+
+## Documentation Requirements
+
+### Technical Documentation
+- API documentation with examples
+- Database schema documentation
+- Architecture decision records (ADRs)
+- Deployment and operations guides
+- Troubleshooting guides
+
+### User Documentation
+- User manuals and tutorials
+- Feature guides and best practices
+- FAQ and troubleshooting
+- Video tutorials and demos
+
+## Future Considerations
+
+### Scalability
+- Plan for multi-tenant architecture
+- Consider microservices decomposition
+- Plan for global distribution
+- Design for horizontal scaling
+
+### Integration
+- ERP system integration
+- Accounting system integration
+- Mobile app development
+- Third-party service integrations
+- API marketplace considerations
+
+Remember: Always prioritize security, performance, and maintainability in your implementations. Follow the established patterns and conventions, and document any deviations or architectural decisions.
