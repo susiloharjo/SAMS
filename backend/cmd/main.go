@@ -29,9 +29,12 @@ func main() {
 	}
 
 	// Auto-migrate database schema
-	if err := db.AutoMigrate(&models.Category{}, &models.Asset{}, &models.Department{}); err != nil {
+	if err := db.AutoMigrate(&models.Category{}, &models.Asset{}, &models.Department{}, &models.User{}); err != nil {
 		log.Fatal("Failed to migrate database:", err)
 	}
+
+	// Initialize handlers
+	userHandler := handlers.NewUserHandler(db)
 
 	// Initialize Fiber app
 	app := fiber.New(fiber.Config{
@@ -95,6 +98,14 @@ func main() {
 	app.Get("/api/v1/assets/:id/qr", handlers.GenerateAssetQR)
 
 	app.Post("/api/v1/ai/query", handlers.HandleAIQuery)
+
+	// User Management Routes
+	app.Get("/api/v1/users", userHandler.GetUsers)
+	app.Get("/api/v1/users/summary", userHandler.GetUserSummary)
+	app.Post("/api/v1/users", userHandler.CreateUser)
+	app.Get("/api/v1/users/:id", userHandler.GetUser)
+	app.Put("/api/v1/users/:id", userHandler.UpdateUser)
+	app.Delete("/api/v1/users/:id", userHandler.DeleteUser)
 
 	// Start server
 	port := os.Getenv("SERVER_PORT")
