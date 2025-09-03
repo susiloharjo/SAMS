@@ -88,7 +88,6 @@ func main() {
 	app.Get("/api/v1/assets/:id", handlers.GetAsset)
 	app.Put("/api/v1/assets/:id", handlers.UpdateAsset)
 	app.Delete("/api/v1/assets/:id", handlers.DeleteAsset)
-	app.Delete("/api/v1/assets/bulk", handlers.DeleteAssets) // <-- Add this line
 	app.Get("/api/v1/assets/:id/qr", handlers.GenerateAssetQR)
 
 	app.Post("/api/v1/ai/query", handlers.HandleAIQuery)

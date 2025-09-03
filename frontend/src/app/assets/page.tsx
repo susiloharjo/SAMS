@@ -246,29 +246,32 @@ export default function AssetsPage() {
 
     if (window.confirm(`Are you sure you want to delete ${selectedAssets.size} selected asset(s)? This action cannot be undone.`)) {
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/bulk`, {
-          method: 'DELETE',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ ids: Array.from(selectedAssets) }),
-        });
+        const deletePromises = Array.from(selectedAssets).map(assetId =>
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/${assetId}`, {
+            method: 'DELETE',
+          })
+        );
 
-        if (response.ok) {
+        const responses = await Promise.all(deletePromises);
+
+        const allSucceeded = responses.every(res => res.ok);
+
+        if (allSucceeded) {
           // Reset selection and refetch data
           setSelectedAssets(new Set());
           setSelectAll(false);
           setDataVersion(v => v + 1);
         } else {
-          console.error('Failed to delete assets');
+          alert('Some assets could not be deleted. Please refresh and try again.');
+          // Optionally, identify which ones failed from `responses`
+          setDataVersion(v => v + 1);
         }
       } catch (error) {
-        console.error('Error deleting assets:', error);
+        console.error('Error during bulk delete:', error);
+        alert('An error occurred while trying to delete assets.');
       }
     }
   };
-
-
 
   const resetForm = () => {
     setFormData({
