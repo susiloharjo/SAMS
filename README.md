@@ -35,11 +35,18 @@ docker-compose logs -f postgres
 ```
 
 ### **2. Access Services**
-- **PostgreSQL**: `localhost:5432` (sams_db, sams_user, sams_password)
-- **pgAdmin**: `http://localhost:5050` (admin@sams.local, admin123)
-- **Redis**: `localhost:6379`
+- **PostgreSQL**: `localhost:5433` (configured via environment variables)
+- **pgAdmin**: `http://localhost:5051` (configured via environment variables)
+- **Redis**: `localhost:6380`
 
-### **3. Stop Services**
+### **3. Environment Setup**
+Before starting services, copy `env.example` to `.env` and configure your environment variables:
+```bash
+cp env.example .env
+# Edit .env with your actual values
+```
+
+### **4. Stop Services**
 ```bash
 docker-compose down
 ```

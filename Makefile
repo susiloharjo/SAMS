@@ -17,9 +17,14 @@ help:
 	@echo "  deps-tidy - Tidy Go dependencies"
 	@echo ""
 	@echo "Docker:"
-	@echo "  docker-up   - Start Docker services"
-	@echo "  docker-down - Stop Docker services"
+	@echo "  docker-up   - Start all Docker services"
+	@echo "  docker-down - Stop all Docker services"
 	@echo "  docker-logs - View Docker logs"
+	@echo ""
+	@echo "Frontend:"
+	@echo "  frontend-install - Install frontend dependencies"
+	@echo "  frontend-build   - Build frontend for production"
+	@echo "  frontend-dev     - Start frontend development server"
 	@echo ""
 	@echo "Database:"
 	@echo "  db-reset   - Reset database (drop and recreate)"
@@ -68,6 +73,19 @@ docker-logs:
 	@echo "Viewing Docker logs..."
 	docker-compose logs -f
 
+# Frontend commands
+frontend-build:
+	@echo "Building frontend..."
+	cd frontend && npm run build
+
+frontend-dev:
+	@echo "Starting frontend development server..."
+	cd frontend && npm run dev
+
+frontend-install:
+	@echo "Installing frontend dependencies..."
+	cd frontend && npm install
+
 # Database commands
 db-reset:
 	@echo "Resetting database..."
@@ -75,8 +93,8 @@ db-reset:
 	docker-compose up -d postgres
 	@echo "Waiting for database to be ready..."
 	sleep 10
-	docker-compose exec postgres psql -U sams_user -d sams_db -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-	docker-compose exec postgres psql -U sams_user -d sams_db -f /docker-entrypoint-initdb.d/init-db.sql
+	docker-compose exec postgres psql -U $$DB_USER -d $$DB_NAME -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+	docker-compose exec postgres psql -U $$DB_USER -d $$DB_NAME -f /docker-entrypoint-initdb.d/init-db.sql
 
 db-migrate:
 	@echo "Running database migrations..."
@@ -84,9 +102,10 @@ db-migrate:
 
 # Complete setup
 setup: deps build docker-up
-	@echo "Setup complete! SAMS Backend is ready."
+	@echo "Setup complete! SAMS is ready."
 	@echo ""
 	@echo "Services running:"
+	@echo "  - Frontend: http://localhost:3000"
 	@echo "  - Backend: http://localhost:8080"
 	@echo "  - Database: localhost:5433"
 	@echo "  - pgAdmin: http://localhost:5051"
@@ -94,8 +113,8 @@ setup: deps build docker-up
 	@echo ""
 	@echo "Next steps:"
 	@echo "  1. Copy env.example to .env and configure API keys"
-	@echo "  2. Run 'make run' to start the backend"
-	@echo "  3. Test the API endpoints"
+	@echo "  2. Run 'make docker-up' to start all services"
+	@echo "  3. Access the frontend at http://localhost:3000"
 
 # Development with hot reload (requires air)
 dev:

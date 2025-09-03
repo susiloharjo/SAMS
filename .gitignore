@@ -1,0 +1,63 @@
+# Environment files
+.env
+.env.local
+.env.*.local
+env.docker
+env.local
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Dependencies
+node_modules/
+vendor/
+
+# Build outputs
+dist/
+build/
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+
+# Docker volumes
+postgres_data/
+pgadmin_data/
+
+# Go specific
+*.test
+*.out
+
+# Frontend build
+.next/
+out/
+
+# Secrets and keys
+*.pem
+*.key
+*.crt
+secrets/
+keys/

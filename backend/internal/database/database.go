@@ -14,6 +14,14 @@ var DB *gorm.DB
 
 // InitDB initializes the database connection
 func InitDB() (*gorm.DB, error) {
+	// Check if required environment variables are set
+	requiredEnvVars := []string{"DB_HOST", "DB_USER", "DB_PASSWORD", "DB_NAME", "DB_PORT"}
+	for _, envVar := range requiredEnvVars {
+		if os.Getenv(envVar) == "" {
+			return nil, fmt.Errorf("required environment variable %s is not set", envVar)
+		}
+	}
+
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
 		os.Getenv("DB_HOST"),
 		os.Getenv("DB_USER"),
@@ -22,11 +30,6 @@ func InitDB() (*gorm.DB, error) {
 		os.Getenv("DB_PORT"),
 		os.Getenv("DB_SSL_MODE"),
 	)
-
-	// Set default values if environment variables are not set
-	if os.Getenv("DB_HOST") == "" {
-		dsn = "host=localhost user=sams_user password=sams_password dbname=sams_db port=5433 sslmode=disable"
-	}
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),

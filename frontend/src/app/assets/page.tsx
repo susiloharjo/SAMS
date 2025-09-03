@@ -171,12 +171,10 @@ export default function AssetsPage() {
       }
 
       const url = `http://localhost:8080/api/v1/assets?${params.toString()}`;
-      console.log('Fetching assets with URL:', url); // DEBUG LOG
       const response = await fetch(url)
       const data = await response.json()
       
       if (data.error === false) {
-        console.log('Received assets from fetchAssets:', data.data); // DEBUG LOG 2
         setAssets(data.data || [])
         setTotalAssets(data.pagination.total)
         setTotalPages(data.pagination.total_pages)
@@ -253,7 +251,6 @@ export default function AssetsPage() {
       
       if (response.ok) {
         const responseData = await response.json();
-        console.log('Update successful, API response:', responseData); // DEBUG LOG 1
         setShowEditModal(false)
         resetForm()
         // Go to page 1 and trigger a refetch to see the updated asset's new position

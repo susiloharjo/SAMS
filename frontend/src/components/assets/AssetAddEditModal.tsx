@@ -1,15 +1,14 @@
 'use client';
 
 import { Asset, Category, Department } from '@/app/assets/page';
-import { X } from 'lucide-react';
 
 interface AssetAddEditModalProps {
   show: boolean;
   onClose: () => void;
   onSave: () => void;
   asset: Partial<Asset> | null;
-  formData: any;
-  setFormData: (data: any) => void;
+  formData: Partial<Asset>;
+  setFormData: (data: Partial<Asset>) => void;
   categories: Category[];
   departments: Department[];
   openMapPicker: () => void;
@@ -177,7 +176,7 @@ export const AssetAddEditModal = ({
                     </svg>
                     Pick Location on Map
                   </button>
-                  {(formData.latitude !== 0 || formData.longitude !== 0) && (
+                  {(formData.latitude && formData.longitude && (formData.latitude !== 0 || formData.longitude !== 0)) && (
                     <div className="text-sm text-gray-600">
                       📍 {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
                     </div>
