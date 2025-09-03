@@ -12,7 +12,22 @@ export default function AIChatPage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Hello! I\'m SAMS your AI Assistant. I can help you with asset management questions, generate reports, and provide insights about your inventory. How can I assist you today?'
+      content: `Hello! I'm SAMS your AI Assistant. I can help you with asset management questions and provide real-time information about your inventory.
+
+**What I can help you with:**
+• **Asset Information**: Search for specific assets by name, model, or serial number
+• **Asset Categories**: Find assets by type (IT Equipment, Vehicles, Tools)
+• **Asset Status**: Find active, maintenance, or disposed assets  
+• **Asset Location**: Find assets by location, building, or room
+• **Asset Summaries**: Get total counts, values, and overviews
+
+**Try asking questions like:**
+• "What's the total value of IT equipment?"
+• "How many vehicles do we have?"
+• "Show me all active assets"
+• "Tell me about Samsung Galaxy Tab S7"
+
+How can I assist you today?`
     }
   ]);
   const [input, setInput] = useState('');
@@ -142,7 +157,7 @@ export default function AIChatPage() {
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask me about your assets, request reports, or get insights..."
+              placeholder="Ask about asset values, categories, locations, or search for specific assets..."
               className="w-full px-6 py-4 pr-16 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm text-gray-700 placeholder-gray-400 transition-all duration-200 hover:shadow-md focus:shadow-lg"
               disabled={isLoading}
             />
@@ -159,10 +174,14 @@ export default function AIChatPage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <span className="text-xs text-gray-500 mr-2">Try asking:</span>
             {[
-              "Show me assets that need maintenance",
-              "Generate a monthly asset report",
               "What's the total value of IT equipment?",
-              "Find assets by location"
+              "How many vehicles do we have?",
+              "Show me all active assets",
+              "Find assets in Jakarta",
+              "What's our total asset value?",
+              "Show me maintenance assets",
+              "Tell me about Samsung Galaxy Tab S7",
+              "Assets by department"
             ].map((suggestion, index) => (
               <button
                 key={index}

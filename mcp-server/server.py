@@ -542,6 +542,11 @@ async def list_tools():
         logging.error(f"Error listing tools: {e}")
         return {"error": str(e), "tools": []}
 
+@app.get("/list_tools")
+async def list_tools_alt():
+    """Alternative endpoint to get the list of available tools and their schemas."""
+    return await list_tools()
+
 @app.post("/call/{tool_name}")
 async def call_tool(tool_name: str, params: dict[str, Any]):
     """Endpoint to execute a specific tool with given parameters."""

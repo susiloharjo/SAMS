@@ -273,6 +273,36 @@ func determineMCPTool(message string) (string, map[string]interface{}) {
 		return "get_assets_by_category", map[string]interface{}{"category": "Tools", "limit": 20}
 	}
 
+	// PRIORITY 2.5: Department-specific queries
+	if strings.Contains(lowerMessage, "department") || strings.Contains(lowerMessage, "departement") ||
+		strings.Contains(lowerMessage, "dept") || strings.Contains(lowerMessage, "by department") {
+
+		// First, try to extract the actual department name from the query
+		departmentName := ""
+
+		// Check for specific department names from our database
+		if strings.Contains(lowerMessage, "project") {
+			departmentName = "Project"
+		} else if strings.Contains(lowerMessage, "finance") || strings.Contains(lowerMessage, "accounting") {
+			departmentName = "Finance"
+		} else if strings.Contains(lowerMessage, "human capital") || strings.Contains(lowerMessage, "hc") {
+			departmentName = "Human Capital (HC)"
+		} else if strings.Contains(lowerMessage, "operation") || strings.Contains(lowerMessage, "operations") || strings.Contains(lowerMessage, "ops") {
+			departmentName = "Operation"
+		} else if strings.Contains(lowerMessage, "information technology") || strings.Contains(lowerMessage, "it") {
+			departmentName = "Information Technology (IT)"
+		} else if strings.Contains(lowerMessage, "marketing") {
+			departmentName = "Marketing"
+		}
+
+		// If no specific department found, default to IT
+		if departmentName == "" {
+			departmentName = "Information Technology (IT)"
+		}
+
+		return "get_assets_by_department", map[string]interface{}{"department": departmentName, "limit": 20}
+	}
+
 	// PRIORITY 3: Asset summary and overview queries
 	if strings.Contains(lowerMessage, "summary") || strings.Contains(lowerMessage, "overview") ||
 		strings.Contains(lowerMessage, "count") || strings.Contains(lowerMessage, "how many") {
