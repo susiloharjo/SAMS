@@ -18,11 +18,20 @@ ARG NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_ENVIRONMENT
 
+# Expose ARGs as ENV variables for the build process
+ENV NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=$NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_ENVIRONMENT=$NEXT_PUBLIC_ENVIRONMENT
+
+# --- DIAGNOSTIC STEP ---
+RUN echo "Debug: NEXT_PUBLIC_API_URL is set to '$NEXT_PUBLIC_API_URL'"
+# --- END DIAGNOSTIC STEP ---
+
 # Build the Next.js application
 RUN npm run build
 
-# Remove dev dependencies after build
-RUN npm prune --production
+# Remove dev dependencies but keep TypeScript for Next.js config
+RUN npm prune --production && npm install typescript
 
 # Expose the port the app runs on
 EXPOSE 3000

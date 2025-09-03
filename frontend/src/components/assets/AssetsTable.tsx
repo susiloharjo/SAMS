@@ -31,8 +31,6 @@ interface AssetsTableProps {
   handleSelectAll: () => void;
   handleAssetSelection: (assetId: string) => void;
   openQRModal: (asset: Asset) => void;
-  openEditModal: (asset: Asset) => void;
-  openDeleteModal: (asset: Asset) => void;
 }
 
 export const AssetsTable = ({
@@ -42,9 +40,7 @@ export const AssetsTable = ({
   totalAssets,
   handleSelectAll,
   handleAssetSelection,
-  openQRModal,
-  openEditModal,
-  openDeleteModal
+  openQRModal
 }: AssetsTableProps) => {
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
@@ -158,20 +154,12 @@ export const AssetsTable = ({
                 </td>
                 
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => openEditModal(asset)}
-                      className="text-indigo-600 hover:text-indigo-900"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => openDeleteModal(asset)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => window.location.href = `/assets/${asset.id}`}
+                    className="text-green-600 hover:text-green-900"
+                  >
+                    View Details
+                  </button>
                 </td>
               </tr>
             ))}

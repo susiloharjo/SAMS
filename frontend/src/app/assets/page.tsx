@@ -7,7 +7,6 @@ import { X } from 'lucide-react'
 import { MapPicker } from '@/components/assets/MapPicker'
 import { AssetsTable } from '@/components/assets/AssetsTable'
 import { AssetAddEditModal } from '@/components/assets/AssetAddEditModal'
-import { AssetDeleteModal } from '@/components/assets/AssetDeleteModal'
 import { AssetQRModal } from '@/components/assets/AssetQRModal'
 import { AssetControls } from '@/components/assets/AssetControls'
 import { PaginationControls } from '@/components/assets/PaginationControls'
@@ -65,8 +64,6 @@ export default function AssetsPage() {
   
   // CRUD Modal States
   const [showAddModal, setShowAddModal] = useState(false)
-  const [showEditModal, setShowEditModal] = useState(false)
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showQRModal, setShowQRModal] = useState(false)
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null)
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('')
@@ -170,8 +167,12 @@ export default function AssetsPage() {
         params.append('category', categoryFilter);
       }
 
-      const url = `http://localhost:8080/api/v1/assets?${params.toString()}`;
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets?${params.toString()}`;
       const response = await fetch(url)
+      
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
       const data = await response.json()
       
       if (data.error === false) {
@@ -190,7 +191,10 @@ export default function AssetsPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/v1/categories')
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch categories');
+      }
       const data = await response.json()
       setCategories(data.data || [])
     } catch (error) {
@@ -201,8 +205,8 @@ export default function AssetsPage() {
   const fetchRelatedData = async () => {
     try {
       const [categoriesRes, departmentsRes] = await Promise.all([
-        fetch('http://localhost:8080/api/v1/categories'),
-        fetch('http://localhost:8080/api/v1/departments'),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments`),
       ]);
       
       const categoriesData = await categoriesRes.json();
@@ -217,7 +221,7 @@ export default function AssetsPage() {
 
   const handleAddAsset = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/v1/assets', {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -237,49 +241,7 @@ export default function AssetsPage() {
     }
   }
 
-  const handleEditAsset = async () => {
-    if (!selectedAsset) return
-    
-    try {
-      const response = await fetch(`http://localhost:8080/api/v1/assets/${selectedAsset.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
-      
-      if (response.ok) {
-        const responseData = await response.json();
-        setShowEditModal(false)
-        resetForm()
-        // Go to page 1 and trigger a refetch to see the updated asset's new position
-        if (currentPage !== 1) setCurrentPage(1);
-        setDataVersion(v => v + 1);
-      }
-    } catch (error) {
-      console.error('Error updating asset:', error)
-    }
-  }
 
-  const handleDeleteAsset = async () => {
-    if (!selectedAsset) return
-    
-    try {
-      const response = await fetch(`http://localhost:8080/api/v1/assets/${selectedAsset.id}`, {
-        method: 'DELETE',
-      })
-      
-      if (response.ok) {
-        setShowDeleteModal(false)
-        setSelectedAsset(null)
-        // Trigger a refetch on the current page. If it becomes empty, pagination logic should handle it.
-        setDataVersion(v => v + 1);
-      }
-    } catch (error) {
-      console.error('Error deleting asset:', error)
-    }
-  }
 
   const resetForm = () => {
     setFormData({
@@ -305,36 +267,7 @@ export default function AssetsPage() {
     })
   }
 
-  const openEditModal = (asset: Asset) => {
-    setSelectedAsset(asset)
-    setFormData({
-      name: asset.name,
-      description: asset.description,
-      category_id: asset.category_id,
-      department_id: asset.department_id,
-      type: asset.type,
-      model: asset.model,
-      serial_number: asset.serial_number,
-      manufacturer: asset.manufacturer,
-      acquisition_cost: asset.acquisition_cost,
-      current_value: asset.current_value,
-      status: asset.status,
-      condition: asset.condition,
-      criticality: asset.criticality,
-      latitude: asset.latitude,
-      longitude: asset.longitude,
-      address: asset.address,
-      building_room: asset.building_room,
-      acquisition_date: asset.acquisition_date,
-      expected_life_years: asset.expected_life_years
-    })
-    setShowEditModal(true)
-  }
 
-  const openDeleteModal = (asset: Asset) => {
-    setSelectedAsset(asset)
-    setShowDeleteModal(true)
-  }
 
   const openQRModal = async (asset: Asset) => {
     setSelectedAsset(asset)
@@ -882,8 +815,6 @@ export default function AssetsPage() {
         handleSelectAll={handleSelectAll}
         handleAssetSelection={handleAssetSelection}
         openQRModal={openQRModal}
-        openEditModal={openEditModal}
-        openDeleteModal={openDeleteModal}
       />
 
       {/* Pagination Controls */}
@@ -896,29 +827,20 @@ export default function AssetsPage() {
         onPageSizeChange={setPageSize}
       />
 
-      {/* Add/Edit Asset Modal */}
+      {/* Add Asset Modal */}
       <AssetAddEditModal
-        show={showAddModal || showEditModal}
+        show={showAddModal}
         onClose={() => {
           setShowAddModal(false);
-          setShowEditModal(false);
           resetForm();
         }}
-        onSave={showEditModal ? handleEditAsset : handleAddAsset}
-        asset={selectedAsset}
+        onSave={handleAddAsset}
+        asset={null}
         formData={formData}
         setFormData={setFormData}
         categories={categories}
         departments={departments}
         openMapPicker={openMapPicker}
-      />
-
-      {/* Delete Asset Modal */}
-      <AssetDeleteModal
-        show={showDeleteModal}
-        onClose={() => setShowDeleteModal(false)}
-        onDelete={handleDeleteAsset}
-        asset={selectedAsset}
       />
 
       {/* QR Code Modal */}
