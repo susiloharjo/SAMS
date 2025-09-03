@@ -2,6 +2,7 @@
 
 import { Asset } from '@/app/assets/page';
 import { formatIDR } from '@/utils/currency';
+import { useRouter } from 'next/navigation';
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -42,6 +43,17 @@ export const AssetsTable = ({
   handleAssetSelection,
   openQRModal
 }: AssetsTableProps) => {
+  const router = useRouter();
+
+  const handleRowClick = (assetId: string, event: React.MouseEvent) => {
+    // Don't navigate if clicking on checkbox or QR button
+    if ((event.target as HTMLElement).closest('input[type="checkbox"]') || 
+        (event.target as HTMLElement).closest('button')) {
+      return;
+    }
+    router.push(`/assets/${assetId}`);
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200">
       <div className="px-6 py-4 border-b border-gray-200">
@@ -70,12 +82,15 @@ export const AssetsTable = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Value</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {assets.map((asset) => (
-              <tr key={asset.id} className="hover:bg-gray-50">
+              <tr 
+                key={asset.id} 
+                className="hover:bg-gray-50 cursor-pointer transition-colors duration-150"
+                onClick={(e) => handleRowClick(asset.id, e)}
+              >
                 <td className="px-6 py-4 whitespace-nowrap">
                   <input
                     type="checkbox"
@@ -150,15 +165,6 @@ export const AssetsTable = ({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V6a1 1 0 00-1-1H5a1 1 0 00-1 1v1a1 1 0 001 1zm12 0h2a1 1 0 001-1V6a1 1 0 00-1-1h-2a1 1 0 00-1 1v1a1 1 0 001 1zM5 20h2a1 1 0 001-1v-1a1 1 0 00-1-1H5a1 1 0 00-1 1v1a1 1 0 001 1z" />
                     </svg>
                     View QR
-                  </button>
-                </td>
-                
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button
-                    onClick={() => window.location.href = `/assets/${asset.id}`}
-                    className="text-green-600 hover:text-green-900"
-                  >
-                    View Details
                   </button>
                 </td>
               </tr>
