@@ -386,16 +386,20 @@ export default function AssetDetailPage() {
                   Schedule Maintenance
                 </button>
                 <button
-                   onClick={() => {
-                     if (confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
-                       fetch(`http://localhost:8080/api/v1/assets/${asset.id}`, {
-                         method: 'DELETE',
-                       }).then(() => {
-                         router.push('/assets');
-                       });
-                     }
-                   }}
-                   className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                  onClick={() => {
+                    if (window.confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
+                      fetch(`http://localhost:8080/api/v1/assets/${asset.id}`, {
+                        method: 'DELETE',
+                      }).then(response => {
+                        if (response.ok) {
+                          router.push('/assets');
+                        } else {
+                          alert('Failed to delete asset.');
+                        }
+                      });
+                    }
+                  }}
+                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
                 >
                   Delete Asset
                 </button>

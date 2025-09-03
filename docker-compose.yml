@@ -24,20 +24,20 @@ services:
       - "6380:6379"
     restart: unless-stopped
 
-  # pgAdmin (Database Management)
-  sams-pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: sams-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-    ports:
-      - "5051:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    depends_on:
-      - sams-postgres
-    restart: unless-stopped
+  # # pgAdmin (Database Management)
+  # sams-pgadmin:
+  #   image: dpage/pgadmin4:latest
+  #   container_name: sams-pgadmin
+  #   environment:
+  #     PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+  #     PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+  #   ports:
+  #     - "5051:80"
+  #   volumes:
+  #     - pgadmin_data:/var/lib/pgadmin
+  #   depends_on:
+  #     - sams-postgres
+  #   restart: unless-stopped
 
   # SAMS Backend
   sams-backend:

@@ -487,3 +487,61 @@ func GenerateAssetQR(c *fiber.Ctx) error {
 
 	return c.Send(qrCode)
 }
+
+// DeleteAssets handles the bulk deletion of assets
+func DeleteAssets(c *fiber.Ctx) error {
+	type DeleteRequest struct {
+		IDs []string `json:"ids"`
+	}
+
+	var req DeleteRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   true,
+			"message": "Cannot parse JSON",
+		})
+	}
+
+	if len(req.IDs) == 0 {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error":   true,
+			"message": "No asset IDs provided for deletion",
+		})
+	}
+
+	tx := database.DB.Begin()
+	if tx.Error != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": true, "message": "Failed to start transaction"})
+	}
+
+	for _, idStr := range req.IDs {
+		// Validate each ID
+		assetID, err := uuid.Parse(idStr)
+		if err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+				"error":   true,
+				"message": fmt.Sprintf("Invalid UUID format: %s", idStr),
+			})
+		}
+
+		// Delete each asset by its parsed UUID
+		if err := tx.Delete(&models.Asset{}, "id = ?", assetID).Error; err != nil {
+			tx.Rollback()
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+				"error":   true,
+				"message": fmt.Sprintf("Failed to delete asset %s", idStr),
+			})
+		}
+	}
+
+	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": true, "message": "Failed to commit transaction"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{
+		"error":   false,
+		"message": "Assets deleted successfully",
+	})
+}

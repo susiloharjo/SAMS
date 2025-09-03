@@ -241,6 +241,33 @@ export default function AssetsPage() {
     }
   }
 
+  const handleBulkDelete = async () => {
+    if (selectedAssets.size === 0) return;
+
+    if (window.confirm(`Are you sure you want to delete ${selectedAssets.size} selected asset(s)? This action cannot be undone.`)) {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/bulk`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ ids: Array.from(selectedAssets) }),
+        });
+
+        if (response.ok) {
+          // Reset selection and refetch data
+          setSelectedAssets(new Set());
+          setSelectAll(false);
+          setDataVersion(v => v + 1);
+        } else {
+          console.error('Failed to delete assets');
+        }
+      } catch (error) {
+        console.error('Error deleting assets:', error);
+      }
+    }
+  };
+
 
 
   const resetForm = () => {
@@ -796,6 +823,7 @@ export default function AssetsPage() {
       <AssetControls
         selectedAssetsSize={selectedAssets.size}
         onBulkPrint={generateBulkQRCodes}
+        onBulkDelete={handleBulkDelete} // <-- Connect the function
         onAddNew={() => setShowAddModal(true)}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
