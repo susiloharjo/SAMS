@@ -19,8 +19,21 @@ export const MapPicker = ({ onLocationSelect, onClose, initialLocation }: {
     const geocoder = new google.maps.Geocoder();
     geocoder.geocode({ location }, (results, status) => {
       if (status === 'OK' && results && results[0]) {
-        const address = results[0].formatted_address;
-        const premiseComponent = results[0].address_components.find(c => 
+        // Build address from components to avoid Plus Codes
+        const addressComponents = results[0].address_components;
+        const streetNumber = addressComponents.find(c => c.types.includes('street_number'))?.long_name || '';
+        const route = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
+        const locality = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
+        const administrativeArea = addressComponents.find(c => c.types.includes('administrative_area_level_1'))?.long_name || '';
+        const postalCode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
+        const country = addressComponents.find(c => c.types.includes('country'))?.long_name || '';
+        
+        // Build clean address without Plus Code
+        const streetAddress = [streetNumber, route].filter(Boolean).join(' ');
+        const cityState = [locality, administrativeArea].filter(Boolean).join(', ');
+        const address = [streetAddress, cityState, postalCode, country].filter(Boolean).join(', ');
+        
+        const premiseComponent = addressComponents.find(c => 
           c.types.includes('premise') || 
           c.types.includes('point_of_interest') || 
           c.types.includes('establishment')
@@ -87,8 +100,22 @@ export const MapPicker = ({ onLocationSelect, onClose, initialLocation }: {
         const location = results[0].geometry.location;
         const newLocation = { lat: location.lat(), lng: location.lng() };
         setSelectedLocation(newLocation);
-        const address = results[0].formatted_address;
-        const premiseComponent = results[0].address_components.find(c => c.types.includes('premise') || c.types.includes('establishment'));
+        
+        // Build address from components to avoid Plus Codes
+        const addressComponents = results[0].address_components;
+        const streetNumber = addressComponents.find(c => c.types.includes('street_number'))?.long_name || '';
+        const route = addressComponents.find(c => c.types.includes('route'))?.long_name || '';
+        const locality = addressComponents.find(c => c.types.includes('locality'))?.long_name || '';
+        const administrativeArea = addressComponents.find(c => c.types.includes('administrative_area_level_1'))?.long_name || '';
+        const postalCode = addressComponents.find(c => c.types.includes('postal_code'))?.long_name || '';
+        const country = addressComponents.find(c => c.types.includes('country'))?.long_name || '';
+        
+        // Build clean address without Plus Code
+        const streetAddress = [streetNumber, route].filter(Boolean).join(' ');
+        const cityState = [locality, administrativeArea].filter(Boolean).join(', ');
+        const address = [streetAddress, cityState, postalCode, country].filter(Boolean).join(', ');
+        
+        const premiseComponent = addressComponents.find(c => c.types.includes('premise') || c.types.includes('establishment'));
         const building = premiseComponent?.long_name || '';
         setAddressDetails({ address, building });
       } else {
