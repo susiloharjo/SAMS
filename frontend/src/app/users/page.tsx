@@ -6,6 +6,7 @@ import UserAddEditModal from '@/components/users/UserAddEditModal';
 import UserDeleteModal from '@/components/users/UserDeleteModal';
 import UserViewModal from '@/components/users/UserViewModal';
 import { PaginationControls } from '@/components/assets/PaginationControls';
+import { api } from '@/utils/api';
 
 interface User {
   id: string;
@@ -45,8 +46,6 @@ export default function UsersPage() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
   useEffect(() => {
     fetchUsers();
     fetchDepartments();
@@ -61,9 +60,7 @@ export default function UsersPage() {
         ...(searchTerm && { search: searchTerm }),
       });
 
-      const response = await fetch(`${API_URL}/api/v1/users?${params}`);
-      if (!response.ok) throw new Error('Failed to fetch users');
-
+      const response = await api.get(`/api/v1/users?${params}`);
       const data = await response.json();
       setUsers(data.data || []);
       setTotalPages(data.pagination?.pages || 1);
@@ -77,9 +74,7 @@ export default function UsersPage() {
 
   const fetchDepartments = async () => {
     try {
-      const response = await fetch(`${API_URL}/api/v1/departments`);
-      if (!response.ok) throw new Error('Failed to fetch departments');
-
+      const response = await api.get('/api/v1/departments');
       const data = await response.json();
       setDepartments(data.data || []);
     } catch (error) {

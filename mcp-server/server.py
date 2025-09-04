@@ -20,10 +20,17 @@ mcp = FastMCP(
 SAMS_API_BASE = "http://sams-backend:8080/api/v1" # Use Docker service name for container communication
 USER_AGENT = "sams-mcp-server/1.0"
 
+# Service account token for MCP server (admin user token)
+SERVICE_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTcwMzI3OTAsImlhdCI6MTc1Njk0NjM5MCwicm9sZSI6ImFkbWluIiwidXNlcl9pZCI6ImNkNzg3NGE5LWEwOGQtNDI5Mi04YmVmLWU5NGQ2NGMxY2ViNyIsInVzZXJuYW1lIjoiYWRtaW4ifQ.eYCGIv8pXVInRFnSj4p44zRju3iE41u1BiaBoMaAHdw"
+
 async def make_sams_request(endpoint: str, method: str = "GET", data: dict = None) -> dict[str, Any] | None:
     """Make a request to the SAMS API with proper error handling."""
     url = f"{SAMS_API_BASE}{endpoint}"
-    headers = {"User-Agent": USER_AGENT, "Content-Type": "application/json"}
+    headers = {
+        "User-Agent": USER_AGENT, 
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {SERVICE_TOKEN}"
+    }
     
     async with httpx.AsyncClient() as client:
         try:

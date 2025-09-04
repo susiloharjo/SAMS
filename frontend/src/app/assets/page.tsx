@@ -10,6 +10,9 @@ import { AssetAddEditModal } from '@/components/assets/AssetAddEditModal'
 import { AssetQRModal } from '@/components/assets/AssetQRModal'
 import { AssetControls } from '@/components/assets/AssetControls'
 import { PaginationControls } from '@/components/assets/PaginationControls'
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
+import { useAuth } from '@/contexts/AuthContext'
+import { api } from '@/utils/api'
 
 export interface Asset {
   id: string
@@ -53,6 +56,7 @@ export interface Department {
 }
 
 export default function AssetsPage() {
+  const { hasRole } = useAuth()
   const [assets, setAssets] = useState<Asset[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
@@ -71,7 +75,7 @@ export default function AssetsPage() {
   const [selectAll, setSelectAll] = useState(false)
   
   // Form States
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Partial<Asset>>({
     name: '',
     description: '',
     category_id: '',
@@ -167,8 +171,8 @@ export default function AssetsPage() {
         params.append('category', categoryFilter);
       }
 
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets?${params.toString()}`;
-      const response = await fetch(url)
+      const url = `/api/v1/assets?${params.toString()}`;
+      const response = await api.get(url)
       
       if (!response.ok) {
         throw new Error('Network response was not ok');
@@ -191,7 +195,7 @@ export default function AssetsPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`)
+      const response = await api.get('/api/v1/categories')
       if (!response.ok) {
         throw new Error('Failed to fetch categories');
       }
@@ -205,8 +209,8 @@ export default function AssetsPage() {
   const fetchRelatedData = async () => {
     try {
       const [categoriesRes, departmentsRes] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`),
-        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments`),
+        api.get('/api/v1/categories'),
+        api.get('/api/v1/departments'),
       ]);
       
       const categoriesData = await categoriesRes.json();
@@ -221,13 +225,7 @@ export default function AssetsPage() {
 
   const handleAddAsset = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      })
+      const response = await api.post('/api/v1/assets', formData)
       
       if (response.ok) {
         setShowAddModal(false)
@@ -247,9 +245,7 @@ export default function AssetsPage() {
     if (window.confirm(`Are you sure you want to delete ${selectedAssets.size} selected asset(s)? This action cannot be undone.`)) {
       try {
         const deletePromises = Array.from(selectedAssets).map(assetId =>
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/${assetId}`, {
-            method: 'DELETE',
-          })
+          api.delete(`/api/v1/assets/${assetId}`)
         );
 
         const responses = await Promise.all(deletePromises);
@@ -296,8 +292,6 @@ export default function AssetsPage() {
       expected_life_years: 5
     })
   }
-
-
 
   const openQRModal = async (asset: Asset) => {
     setSelectedAsset(asset)
@@ -822,95 +816,99 @@ export default function AssetsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <AssetControls
-        selectedAssetsSize={selectedAssets.size}
-        onBulkPrint={generateBulkQRCodes}
-        onBulkDelete={handleBulkDelete} // <-- Connect the function
-        onAddNew={() => setShowAddModal(true)}
-        searchTerm={searchTerm}
-        onSearchChange={setSearchTerm}
-        statusFilter={statusFilter}
-        onStatusChange={setStatusFilter}
-        categoryFilter={categoryFilter}
-        onCategoryChange={setCategoryFilter}
-        categories={categories}
-      />
+    <ProtectedRoute>
+      <div className="space-y-6">
+        <AssetControls
+          selectedAssetsSize={selectedAssets.size}
+          onBulkPrint={generateBulkQRCodes}
+          onBulkDelete={handleBulkDelete}
+          onAddNew={() => setShowAddModal(true)}
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          statusFilter={statusFilter}
+          onStatusChange={setStatusFilter}
+          categoryFilter={categoryFilter}
+          onCategoryChange={setCategoryFilter}
+          categories={categories}
+        />
 
-      {/* Assets Table */}
-      <AssetsTable
-        assets={assets}
-        selectedAssets={selectedAssets}
-        selectAll={selectAll}
-        totalAssets={totalAssets}
-        handleSelectAll={handleSelectAll}
-        handleAssetSelection={handleAssetSelection}
-        openQRModal={openQRModal}
-      />
+        {/* Assets Table */}
+        <AssetsTable
+          assets={assets}
+          selectedAssets={selectedAssets}
+          selectAll={selectAll}
+          totalAssets={totalAssets}
+          handleSelectAll={handleSelectAll}
+          handleAssetSelection={handleAssetSelection}
+          openQRModal={openQRModal}
+        />
 
-      {/* Pagination Controls */}
-      <PaginationControls
-        currentPage={currentPage}
-        pageSize={pageSize}
-        totalAssets={totalAssets}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        onPageSizeChange={setPageSize}
-      />
+        {/* Pagination Controls */}
+        <PaginationControls
+          currentPage={currentPage}
+          pageSize={pageSize}
+          totalAssets={totalAssets}
+          totalPages={totalPages}
+          onPageChange={setCurrentPage}
+          onPageSizeChange={setPageSize}
+        />
 
-      {/* Add Asset Modal */}
-      <AssetAddEditModal
-        show={showAddModal}
-        onClose={() => {
-          setShowAddModal(false);
-          resetForm();
-        }}
-        onSave={handleAddAsset}
-        asset={null}
-        formData={formData}
-        setFormData={setFormData}
-        categories={categories}
-        departments={departments}
-        openMapPicker={openMapPicker}
-      />
+        {/* Add Asset Modal - Only show for admin/manager */}
+        {hasRole(['admin', 'manager']) && (
+          <AssetAddEditModal
+            show={showAddModal}
+            onClose={() => {
+              setShowAddModal(false);
+              resetForm();
+            }}
+            onSave={handleAddAsset}
+            asset={null}
+            formData={formData}
+            setFormData={setFormData}
+            categories={categories}
+            departments={departments}
+            openMapPicker={openMapPicker}
+          />
+        )}
 
-      {/* QR Code Modal */}
-      <AssetQRModal
-        show={showQRModal}
-        onClose={() => setShowQRModal(false)}
-        onDownload={downloadQRCode}
-        asset={selectedAsset}
-        qrCodeDataUrl={qrCodeDataUrl}
-      />
+        {/* QR Code Modal */}
+        <AssetQRModal
+          show={showQRModal}
+          onClose={() => setShowQRModal(false)}
+          onDownload={downloadQRCode}
+          asset={selectedAsset}
+          qrCodeDataUrl={qrCodeDataUrl}
+        />
 
-      {/* Map Picker Modal */}
-      {showMap && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full h-full max-w-4xl max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Select Asset Location</h3>
-              <button onClick={() => setShowMap(false)} className="text-gray-500 hover:text-gray-700">
-                <X className="w-6 h-6" />
-              </button>
+        {/* Map Picker Modal */}
+        {showMap && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 w-full h-full max-w-4xl max-h-[90vh] flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Select Asset Location</h3>
+                <button onClick={() => setShowMap(false)} className="text-gray-500 hover:text-gray-700">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <MapPicker
+                initialLocation={selectedLocation}
+                onLocationSelect={(details) => {
+                  setSelectedLocation({ lat: details.lat, lng: details.lng });
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    latitude: details.lat, 
+                    longitude: details.lng,
+                    address: details.address,
+                    building_room: details.building,
+                  }));
+                  setShowMap(false);
+                }}
+                onClose={() => setShowMap(false)}
+              />
             </div>
-            <MapPicker
-              initialLocation={selectedLocation}
-              onLocationSelect={(details) => {
-                setSelectedLocation({ lat: details.lat, lng: details.lng });
-                setFormData(prev => ({ 
-                  ...prev, 
-                  latitude: details.lat, 
-                  longitude: details.lng,
-                  address: details.address,
-                  building_room: details.building,
-                }));
-                setShowMap(false);
-              }}
-              onClose={() => setShowMap(false)}
-            />
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </ProtectedRoute>
   )
 }

@@ -35,6 +35,8 @@ docker-compose logs -f postgres
 ```
 
 ### **2. Access Services**
+- **Frontend**: `http://localhost:3000`
+- **Backend API**: `http://localhost:8080`
 - **PostgreSQL**: `localhost:5433` (configured via environment variables)
 - **pgAdmin**: `http://localhost:5051` (configured via environment variables)
 - **Redis**: `localhost:6380`
@@ -46,7 +48,16 @@ cp env.example .env
 # Edit .env with your actual values
 ```
 
-### **4. Stop Services**
+### **4. Demo Credentials**
+The system comes with pre-configured demo accounts for testing:
+
+| Role | Username | Password | Access Level |
+|------|----------|----------|--------------|
+| **Admin** | `admin` | `admin123` | Full system access, user management |
+| **Manager** | `manager` | `manager123` | Asset CRUD, categories, departments, AI assistant |
+| **User** | `user` | `user123` | View-only access to assets and reports |
+
+### **5. Stop Services**
 ```bash
 docker-compose down
 ```

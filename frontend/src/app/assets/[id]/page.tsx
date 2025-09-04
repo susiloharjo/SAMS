@@ -6,6 +6,8 @@ import { ArrowLeft, MapPin, DollarSign, Calendar, Settings, Shield, Building, Ta
 import AssetMap from '@/components/assets/AssetMap';
 import { AssetAddEditModal } from '@/components/assets/AssetAddEditModal';
 import { MapPicker } from '@/components/assets/MapPicker';
+import { useAuth } from '@/contexts/AuthContext';
+import { api } from '@/utils/api';
 
 interface Asset {
   id: string;
@@ -36,6 +38,7 @@ interface Asset {
 export default function AssetDetailPage() {
   const params = useParams();
   const router = useRouter();
+  const { hasRole } = useAuth();
   const [asset, setAsset] = useState<Asset | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,8 +62,8 @@ export default function AssetDetailPage() {
   const fetchRelatedData = async () => {
     try {
       const [categoriesRes, departmentsRes] = await Promise.all([
-              fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments`),
+        api.get('/api/v1/categories'),
+        api.get('/api/v1/departments'),
       ]);
       
       const categoriesData = await categoriesRes.json();
@@ -76,10 +79,7 @@ export default function AssetDetailPage() {
   const fetchAsset = async (id: string) => {
     setLoading(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/${id}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch asset');
-      }
+      const response = await api.get(`/api/v1/assets/${id}`);
       const data = await response.json();
       setAsset(data.data);
       console.log('Asset data fetched:', data.data);
@@ -138,13 +138,7 @@ export default function AssetDetailPage() {
     if (!asset) return;
     
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/${asset.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
+      const response = await api.put(`/api/v1/assets/${asset.id}`, formData);
       
       if (response.ok) {
         setShowEditModal(false);
@@ -366,45 +360,50 @@ export default function AssetDetailPage() {
 
         {/* Right Sidebar */}
         <div className="space-y-6">
-           {/* Quick Actions */}
-           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <Settings className="w-5 h-5 mr-2 text-green-600" />
-                Quick Actions
-              </h2>
-              <div className="space-y-3">
-                <button 
-                  onClick={handleEditAsset}
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Edit Asset
-                </button>
-                <button className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                  View QR Code
-                </button>
-                <button className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors">
-                  Schedule Maintenance
-                </button>
-                <button
-                  onClick={() => {
-                    if (window.confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
-                      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/${asset.id}`, {
-                        method: 'DELETE',
-                      }).then(response => {
-                        if (response.ok) {
-                          router.push('/assets');
-                        } else {
-                          alert('Failed to delete asset.');
+           {/* Quick Actions - Only show for admin and manager */}
+           {hasRole(['admin', 'manager']) && (
+             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                  <Settings className="w-5 h-5 mr-2 text-green-600" />
+                  Quick Actions
+                </h2>
+                <div className="space-y-3">
+                  <button 
+                    onClick={handleEditAsset}
+                    className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    Edit Asset
+                  </button>
+                  <button className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                    View QR Code
+                  </button>
+                  <button className="w-full px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors">
+                    Schedule Maintenance
+                  </button>
+                  {hasRole(['admin']) && (
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('Are you sure you want to delete this asset? This action cannot be undone.')) {
+                          try {
+                            const response = await api.delete(`/api/v1/assets/${asset.id}`);
+                            if (response.ok) {
+                              router.push('/assets');
+                            } else {
+                              alert('Failed to delete asset.');
+                            }
+                          } catch (error) {
+                            alert('Failed to delete asset.');
+                          }
                         }
-                      });
-                    }
-                  }}
-                  className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Delete Asset
-                </button>
+                      }}
+                      className="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Delete Asset
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
+           )}
 
             {/* Maintenance History */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

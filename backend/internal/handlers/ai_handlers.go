@@ -382,9 +382,27 @@ func HandleAIQuery(c *fiber.Ctx) error {
 	ctx := context.Background()
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	log.Printf("HandleAIQuery: GEMINI_API_KEY value: %s", apiKey)
-	if apiKey == "" {
-		log.Println("HandleAIQuery: GEMINI_API_KEY not set")
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "GEMINI_API_KEY is not set"})
+	if apiKey == "" || apiKey == "your-google-ai-api-key-here" {
+		log.Println("HandleAIQuery: GEMINI_API_KEY not set or is placeholder, providing fallback response")
+		// Provide a fallback response with the MCP tool data
+		fallbackResponse := fmt.Sprintf(`Hello! I'm your SAMS AI Assistant. I can help you with asset management questions.
+
+Your question: "%s"
+
+Here's what I found:
+%s
+
+I can help you with questions about your assets, such as:
+• Asset summaries and totals
+• Finding assets by category, department, or location
+• Asset status and maintenance information
+• Search for specific assets
+
+What would you like to know about your assets?`, req.Message, mcpResult)
+
+		return c.JSON(fiber.Map{
+			"response": fallbackResponse,
+		})
 	}
 
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
@@ -398,27 +416,24 @@ func HandleAIQuery(c *fiber.Ctx) error {
 	cs := model.StartChat()
 
 	// Enhanced prompt that forces Gemini to use tool data
-	enhancedPrompt := fmt.Sprintf(`You are a SAMS (Smart Asset Management System) AI Assistant. 
-
-IMPORTANT: You MUST use the provided tool data to answer questions. Do NOT make up information.
+	enhancedPrompt := fmt.Sprintf(`You are a helpful SAMS (Smart Asset Management System) AI Assistant. You help users with asset management questions by providing accurate information from the system.
 
 User Query: %s
 
-Available MCP Tool: %s
-Tool Parameters: %v
-
-Tool Result Data:
+Here is the current data from the system:
 %s
 
 INSTRUCTIONS:
-1. Use ONLY the tool data above to answer the user's question
-2. If the tool data is empty or failed, explain what you tried to do and suggest rephrasing
-3. Format your response clearly and professionally
-4. Do NOT invent or assume any asset information not provided by the tools
-5. If the user asks about assets, you MUST use the tool data to provide accurate information
+1. Answer the user's question naturally and conversationally using ONLY the data provided above
+2. Do NOT mention any technical details about tools, APIs, or data retrieval methods
+3. Respond as if you naturally know this information about their assets
+4. If the data is empty or shows an error, politely explain that you couldn't find the information and suggest they try rephrasing their question
+5. Be helpful and friendly in your responses
+6. Format numbers and values clearly (e.g., use commas for large numbers, currency symbols)
+7. If asked about specific assets, categories, or departments, provide the relevant information from the data
 
-Remember: You are a tool-powered AI. Your knowledge comes from the MCP tools, not from general knowledge.`,
-		req.Message, toolName, params, mcpResult)
+Remember: You are a knowledgeable assistant who helps with asset management. Respond naturally without mentioning how you got the information.`,
+		req.Message, mcpResult)
 
 	log.Printf("HandleAIQuery: sending tool-enhanced prompt to Gemini: %s", enhancedPrompt)
 	resp, err := cs.SendMessage(ctx, genai.Text(enhancedPrompt))

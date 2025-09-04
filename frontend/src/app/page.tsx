@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { formatIDR, formatIDRCompact } from '../utils/currency'
+import { api } from '../utils/api'
+import { ProtectedRoute } from '../components/auth/ProtectedRoute'
 
 interface Asset {
   id: string
@@ -63,11 +65,11 @@ export default function Dashboard() {
   const fetchDashboardData = async () => {
     try {
       const [summaryRes, recentAssetsRes, categoriesRes, categoryChartRes, statusChartRes] = await Promise.all([
-              fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/summary`),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets?limit=5&page=1`), // Fetch only 5 recent assets
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/summary-by-category`),
-      fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/assets/summary-by-status`)
+        api.get('/api/v1/assets/summary'),
+        api.get('/api/v1/assets?limit=5&page=1'), // Fetch only 5 recent assets
+        api.get('/api/v1/categories'),
+        api.get('/api/v1/assets/summary-by-category'),
+        api.get('/api/v1/assets/summary-by-status')
       ])
       
       const summaryData = await summaryRes.json()
@@ -107,7 +109,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8">
+    <ProtectedRoute>
+      <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -330,6 +333,7 @@ export default function Dashboard() {
           </table>
         </div>
       </div>
-    </div>
+      </div>
+    </ProtectedRoute>
   )
 }

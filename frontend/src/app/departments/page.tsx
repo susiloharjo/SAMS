@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { DepartmentAddEditModal } from '@/components/departments/DepartmentAddEditModal';
+import { api } from '@/utils/api';
 
 interface Department {
   id: string;
@@ -24,10 +25,7 @@ export default function DepartmentsPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch departments');
-      }
+      const response = await api.get('/api/v1/departments');
       const data = await response.json();
       setDepartments(data.data || []);
     } catch (err) {
@@ -58,19 +56,10 @@ export default function DepartmentsPage() {
   };
 
   const handleSave = async (departmentData: Partial<Department>) => {
-    const url = selectedDepartment
-              ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments/${selectedDepartment.id}`
-        : `${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments`;
-    const method = selectedDepartment ? 'PUT' : 'POST';
-
     try {
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(departmentData),
-      });
+      const response = selectedDepartment
+        ? await api.put(`/api/v1/departments/${selectedDepartment.id}`, departmentData)
+        : await api.post('/api/v1/departments', departmentData);
 
       if (response.ok) {
         setShowAddEditModal(false);
@@ -89,9 +78,7 @@ export default function DepartmentsPage() {
     if (!selectedDepartment) return;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/departments/${selectedDepartment.id}`, {
-        method: 'DELETE',
-      });
+      const response = await api.delete(`/api/v1/departments/${selectedDepartment.id}`);
 
       if (response.ok) {
         setShowDeleteModal(false);

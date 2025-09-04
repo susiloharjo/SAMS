@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { CategoryAddEditModal } from '@/components/categories/CategoryAddEditModal';
+import { api } from '@/utils/api';
 
 // You will need to create these components, similar to the ones for Assets.
 // import { CategoryControls } from '@/components/categories/CategoryControls';
@@ -29,10 +30,7 @@ export default function CategoriesPage() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch categories');
-      }
+      const response = await api.get('/api/v1/categories');
       const data = await response.json();
       setCategories(data.data || []);
     } catch (err) {
@@ -63,19 +61,10 @@ export default function CategoriesPage() {
   };
 
   const handleSave = async (categoryData: Partial<Category>) => {
-    const url = selectedCategory
-              ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories/${selectedCategory.id}`
-        : `${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories`;
-    const method = selectedCategory ? 'PUT' : 'POST';
-
     try {
-      const response = await fetch(url, {
-        method: method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(categoryData),
-      });
+      const response = selectedCategory
+        ? await api.put(`/api/v1/categories/${selectedCategory.id}`, categoryData)
+        : await api.post('/api/v1/categories', categoryData);
 
       if (response.ok) {
         setShowAddEditModal(false);
@@ -94,9 +83,7 @@ export default function CategoriesPage() {
     if (!selectedCategory) return;
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/categories/${selectedCategory.id}`, {
-        method: 'DELETE',
-      });
+      const response = await api.delete(`/api/v1/categories/${selectedCategory.id}`);
 
       if (response.ok) {
         setShowDeleteModal(false);

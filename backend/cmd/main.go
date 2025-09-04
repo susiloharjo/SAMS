@@ -10,6 +10,7 @@ import (
 
 	"sams-backend/internal/database"
 	"sams-backend/internal/handlers"
+	"sams-backend/internal/middleware"
 	"sams-backend/internal/models"
 )
 
@@ -35,6 +36,7 @@ func main() {
 
 	// Initialize handlers
 	userHandler := handlers.NewUserHandler(db)
+	authHandler := handlers.NewAuthHandler(db)
 
 	// Initialize Fiber app
 	app := fiber.New(fiber.Config{
@@ -76,36 +78,50 @@ func main() {
 		})
 	})
 
-	// API Routes
-	app.Get("/api/v1/categories", handlers.GetCategories)
-	app.Post("/api/v1/categories", handlers.CreateCategory)
-	app.Put("/api/v1/categories/:id", handlers.UpdateCategory)
-	app.Delete("/api/v1/categories/:id", handlers.DeleteCategory)
+	// Public Authentication Routes (no middleware required)
+	app.Post("/api/v1/auth/login", authHandler.Login)
+	app.Post("/api/v1/auth/refresh", authHandler.RefreshToken)
 
-	app.Get("/api/v1/departments", handlers.GetDepartments)
-	app.Post("/api/v1/departments", handlers.CreateDepartment)
-	app.Put("/api/v1/departments/:id", handlers.UpdateDepartment)
-	app.Delete("/api/v1/departments/:id", handlers.DeleteDepartment)
+	// Protected Routes (require authentication)
+	// Asset Routes with RBAC
+	app.Get("/api/v1/assets", middleware.AuthMiddleware(), middleware.RequireUser(), handlers.GetAssets)
+	app.Get("/api/v1/assets/summary", middleware.AuthMiddleware(), middleware.RequireUser(), handlers.GetAssetSummary)
+	app.Get("/api/v1/assets/summary-by-category", middleware.AuthMiddleware(), middleware.RequireUser(), handlers.GetCategorySummary)
+	app.Get("/api/v1/assets/summary-by-status", middleware.AuthMiddleware(), middleware.RequireUser(), handlers.GetStatusSummary)
+	app.Get("/api/v1/assets/:id", middleware.AuthMiddleware(), middleware.RequireUser(), handlers.GetAsset)
+	app.Get("/api/v1/assets/:id/qr", middleware.AuthMiddleware(), middleware.RequireUser(), handlers.GenerateAssetQR)
 
-	app.Get("/api/v1/assets", handlers.GetAssets)
-	app.Get("/api/v1/assets/summary", handlers.GetAssetSummary) // Moved up
-	app.Get("/api/v1/assets/summary-by-category", handlers.GetCategorySummary)
-	app.Get("/api/v1/assets/summary-by-status", handlers.GetStatusSummary)
-	app.Post("/api/v1/assets", handlers.CreateAsset)
-	app.Get("/api/v1/assets/:id", handlers.GetAsset)
-	app.Put("/api/v1/assets/:id", handlers.UpdateAsset)
-	app.Delete("/api/v1/assets/:id", handlers.DeleteAsset)
-	app.Get("/api/v1/assets/:id/qr", handlers.GenerateAssetQR)
+	// Asset CRUD operations - only admin and manager
+	app.Post("/api/v1/assets", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.CreateAsset)
+	app.Put("/api/v1/assets/:id", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.UpdateAsset)
+	app.Delete("/api/v1/assets/:id", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.DeleteAsset)
 
-	app.Post("/api/v1/ai/query", handlers.HandleAIQuery)
+	// Category Routes - only admin and manager
+	app.Get("/api/v1/categories", middleware.AuthMiddleware(), middleware.RequireUser(), handlers.GetCategories)
+	app.Post("/api/v1/categories", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.CreateCategory)
+	app.Put("/api/v1/categories/:id", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.UpdateCategory)
+	app.Delete("/api/v1/categories/:id", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.DeleteCategory)
 
-	// User Management Routes
-	app.Get("/api/v1/users", userHandler.GetUsers)
-	app.Get("/api/v1/users/summary", userHandler.GetUserSummary)
-	app.Post("/api/v1/users", userHandler.CreateUser)
-	app.Get("/api/v1/users/:id", userHandler.GetUser)
-	app.Put("/api/v1/users/:id", userHandler.UpdateUser)
-	app.Delete("/api/v1/users/:id", userHandler.DeleteUser)
+	// Department Routes - only admin and manager
+	app.Get("/api/v1/departments", middleware.AuthMiddleware(), middleware.RequireUser(), handlers.GetDepartments)
+	app.Post("/api/v1/departments", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.CreateDepartment)
+	app.Put("/api/v1/departments/:id", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.UpdateDepartment)
+	app.Delete("/api/v1/departments/:id", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.DeleteDepartment)
+
+	// AI Routes - only admin and manager
+	app.Post("/api/v1/ai/query", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.HandleAIQuery)
+
+	// User Management Routes - only admin
+	app.Get("/api/v1/users", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.GetUsers)
+	app.Get("/api/v1/users/summary", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.GetUserSummary)
+	app.Post("/api/v1/users", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.CreateUser)
+	app.Get("/api/v1/users/:id", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.GetUser)
+	app.Put("/api/v1/users/:id", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.UpdateUser)
+	app.Delete("/api/v1/users/:id", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.DeleteUser)
+
+	// User Profile Routes (authenticated users can manage their own profile)
+	app.Post("/api/v1/auth/change-password", middleware.AuthMiddleware(), middleware.RequireUser(), authHandler.ChangePassword)
+	app.Post("/api/v1/auth/logout", middleware.AuthMiddleware(), middleware.RequireUser(), authHandler.Logout)
 
 	// Start server
 	port := os.Getenv("SERVER_PORT")

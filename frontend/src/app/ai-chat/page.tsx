@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Send, Bot, User, Sparkles, MessageCircle } from 'lucide-react';
+import { api } from '@/utils/api';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -52,19 +53,7 @@ How can I assist you today?`
     setIsLoading(true);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/ai/query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: input }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'An error occurred while fetching the AI response.');
-      }
-
+      const response = await api.post('/api/v1/ai/query', { message: input });
       const data = await response.json();
       
       const assistantMessage: Message = {

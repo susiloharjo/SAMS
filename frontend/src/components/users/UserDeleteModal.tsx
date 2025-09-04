@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X, Trash2, AlertTriangle } from 'lucide-react';
+import { api } from '@/utils/api';
 
 interface User {
   id: string;
@@ -28,16 +29,12 @@ export default function UserDeleteModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-
   const handleDelete = async () => {
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch(`${API_URL}/api/v1/users/${user.id}`, {
-        method: 'DELETE',
-      });
+      const response = await api.delete(`/api/v1/users/${user.id}`);
 
       if (!response.ok) {
         const errorData = await response.json();

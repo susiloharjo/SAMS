@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Save, User } from 'lucide-react';
+import { api } from '@/utils/api';
 
 interface User {
   id: string;
@@ -49,7 +50,7 @@ export default function UserAddEditModal({
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+
 
   useEffect(() => {
     if (user && isEditing) {
@@ -124,12 +125,6 @@ export default function UserAddEditModal({
 
     setLoading(true);
     try {
-      const url = isEditing 
-        ? `${API_URL}/api/v1/users/${user?.id}`
-        : `${API_URL}/api/v1/users`;
-
-      const method = isEditing ? 'PUT' : 'POST';
-      
       // For editing, only send fields that have values
       const requestData = isEditing 
         ? {
@@ -152,13 +147,9 @@ export default function UserAddEditModal({
             is_active: formData.is_active,
           };
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestData),
-      });
+      const response = isEditing 
+        ? await api.put(`/api/v1/users/${user?.id}`, requestData)
+        : await api.post('/api/v1/users', requestData);
 
       if (!response.ok) {
         const errorData = await response.json();
