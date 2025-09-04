@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log"
 	"os"
 	"strconv"
 	"time"
@@ -26,13 +27,16 @@ func NewAuthHandler(db *gorm.DB) *AuthHandler {
 
 // Login handles user authentication and returns JWT tokens
 func (h *AuthHandler) Login(c *fiber.Ctx) error {
+	log.Printf("Login handler invoked. Request Body: %s", c.Body()) // Log raw body
 	var req models.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
+		log.Printf("BodyParser error: %v", err) // Log the specific parsing error
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error":   true,
 			"message": "Invalid request body",
 		})
 	}
+	log.Printf("Parsed request: Username=[%s], Password=[%s]", req.Username, req.Password) // Log parsed values
 
 	// Find user by username
 	var user models.User

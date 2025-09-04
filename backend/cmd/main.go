@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 
 	"sams-backend/internal/database"
@@ -35,7 +36,6 @@ func main() {
 
 	// Initialize handlers
 	userHandler := handlers.NewUserHandler(db)
-	authHandler := handlers.NewAuthHandler(db)
 
 	// Initialize Fiber app
 	app := fiber.New(fiber.Config{
@@ -54,19 +54,11 @@ func main() {
 
 	// Middleware
 	app.Use(logger.New())
-
-	// Basic CORS headers for MVP
-	app.Use(func(c *fiber.Ctx) error {
-		c.Set("Access-Control-Allow-Origin", "*")
-		c.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
-
-		if c.Method() == "OPTIONS" {
-			return c.SendStatus(fiber.StatusNoContent)
-		}
-
-		return c.Next()
-	})
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowMethods: "GET, POST, PUT, DELETE, OPTIONS",
+		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
+	}))
 
 	// Health check endpoint
 	app.Get("/health", func(c *fiber.Ctx) error {
@@ -96,9 +88,13 @@ func main() {
 		})
 	})
 
-	// Public Authentication Routes (no middleware required)
-	app.Post("/api/v1/auth/login", authHandler.Login)
-	app.Post("/api/v1/auth/refresh", authHandler.RefreshToken)
+	v1 := app.Group("/api/v1")
+
+	// Auth routes
+	authHandler := handlers.NewAuthHandler(db)
+	auth := v1.Group("/auth")
+	auth.Post("/login", authHandler.Login)
+	auth.Post("/refresh", authHandler.RefreshToken)
 
 	// Protected Routes (require authentication)
 	// Asset Routes with RBAC
