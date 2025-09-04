@@ -53,7 +53,7 @@ How can I assist you today?`
     setIsLoading(true);
 
     try {
-      const response = await api.post('/api/v1/ai/query', { message: input });
+      const response = await api.post('/api/v1/ai/chat', { message: input });
       const data = await response.json();
       
       const assistantMessage: Message = {

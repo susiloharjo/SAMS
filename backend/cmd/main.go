@@ -123,7 +123,7 @@ func main() {
 	app.Delete("/api/v1/departments/:id", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.DeleteDepartment)
 
 	// AI Routes - only admin and manager
-	app.Post("/api/v1/ai/query", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.HandleAIQuery)
+	app.Post("/api/v1/ai/chat", middleware.AuthMiddleware(), middleware.RequireManager(), handlers.HandleAIQuery)
 
 	// User Management Routes - only admin
 	app.Get("/api/v1/users", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.GetUsers)

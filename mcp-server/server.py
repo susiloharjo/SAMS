@@ -5,6 +5,10 @@ import logging
 from fastapi import FastAPI, HTTPException
 import uvicorn
 import inspect
+from dotenv import load_dotenv
+
+# Load environment variables from the root .env file
+load_dotenv(dotenv_path='../.env')
 
 # Configure logging to stderr
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -17,7 +21,10 @@ mcp = FastMCP(
     # description="Provides tools to query the Smart Asset Management System (SAMS)."
 )
 
-SAMS_API_BASE = "http://sams-backend:8080/api/v1" # Use Docker service name for container communication
+# Configuration
+SAMS_API_BASE = "http://sams-backend:8081/api/v1"
+# SAMS_API_BASE = os.getenv("SAMS_API_BASE", "http://sams-backend:8080/api/v1")
+print(f"SAMS_API_BASE set to: {SAMS_API_BASE}")
 USER_AGENT = "sams-mcp-server/1.0"
 
 # Service account token for MCP server (admin user token)
