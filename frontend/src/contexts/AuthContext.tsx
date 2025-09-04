@@ -119,40 +119,46 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // DISABLED: Authentication check is completely disabled to prevent redirect loops
+  // Restored: Authentication check is now enabled
   useEffect(() => {
-    console.log('AuthContext: Authentication check DISABLED');
-    
-    // Just set loading to false immediately
-    setIsLoading(false);
-    
-    // Try to load user from localStorage if available
-    try {
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        setUser(JSON.parse(userData));
-        console.log('AuthContext: Loaded user from localStorage');
+    const checkAuth = () => {
+      setIsLoading(true);
+      if (validateToken()) {
+        try {
+          const userData = localStorage.getItem('user');
+          if (userData) {
+            setUser(JSON.parse(userData));
+          }
+        } catch (error) {
+          console.error('Failed to parse user data from localStorage:', error);
+          logout(); // Clear corrupted data
+        }
+      } else {
+        setUser(null);
+        if (pathname !== '/login') {
+          router.push('/login');
+        }
       }
-    } catch (error) {
-      console.error('Error loading user data:', error);
-    }
-  }, []);
+      setIsLoading(false);
+    };
 
-  // Disabled periodic token validation to prevent issues
-  // useEffect(() => {
-  //   const interval = setInterval(() => {
-  //     if (user && !validateToken()) {
-  //       // Token validation failed, user will be redirected
-  //       return;
-  //     }
-  //   }, 60000); // Check every minute
+    checkAuth();
+  }, [pathname]); // Re-check on route change
 
-  //   return () => clearInterval(interval);
-  // }, [user]);
+  // Re-enabled periodic token validation for long-lived sessions
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (user && !validateToken()) {
+        // Token validation failed, user will be logged out and redirected
+        return;
+      }
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, [user]);
 
   const login = async (username: string, password: string) => {
     try {
-      console.log('AuthContext: Attempting login for user:', username);
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`, {
         method: 'POST',
         headers: {
@@ -162,7 +168,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       });
 
       const data = await response.json();
-      console.log('AuthContext: Login response:', { status: response.status, hasData: !!data.data });
 
       if (!response.ok) {
         throw new Error(data.message || 'Login failed');
@@ -177,7 +182,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       localStorage.setItem('refresh_token', data.data.refresh_token);
       localStorage.setItem('user', JSON.stringify(data.data.user));
 
-      console.log('AuthContext: Login successful, setting user state');
       setUser(data.data.user);
     } catch (error) {
       console.error('AuthContext: Login failed:', error);
