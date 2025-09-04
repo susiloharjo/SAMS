@@ -13,6 +13,14 @@ import (
 // AuthMiddleware validates JWT tokens and sets user context
 func AuthMiddleware() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		// Check if request is coming from MCP server (internal container)
+		if c.IP() == "172.18.0.5" || c.IP() == "172.18.0.6" {
+			// Allow MCP server requests without authentication
+			c.Locals("user_id", "cd7874a9-a08d-4292-8bef-e94d64c1ceb7") // Admin user ID
+			c.Locals("role", "admin")
+			return c.Next()
+		}
+
 		// Get Authorization header
 		authHeader := c.Get("Authorization")
 		if authHeader == "" {

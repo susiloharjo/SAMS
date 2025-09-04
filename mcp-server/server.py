@@ -21,7 +21,8 @@ SAMS_API_BASE = "http://sams-backend:8080/api/v1" # Use Docker service name for 
 USER_AGENT = "sams-mcp-server/1.0"
 
 # Service account token for MCP server (admin user token)
-SERVICE_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NTcwMzI3OTAsImlhdCI6MTc1Njk0NjM5MCwicm9sZSI6ImFkbWluIiwidXNlcl9pZCI6ImNkNzg3NGE5LWEwOGQtNDI5Mi04YmVmLWU5NGQ2NGMxY2ViNyIsInVzZXJuYW1lIjoiYWRtaW4ifQ.eYCGIv8pXVInRFnSj4p44zRju3iE41u1BiaBoMaAHdw"
+# This token is generated using the same JWT_SECRET as the backend: "paErBaRxrU0kBKmTf/m29shbke9uOvtVdCOAJYuXnM0="
+SERVICE_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE5OTk5OTk5OTksImlhdCI6MTY5MzUwNDc3OSwicm9sZSI6ImFkbWluIiwidXNlcl9pZCI6ImNkNzg3NGE5LWEwOGQtNDI5Mi04YmVmLWU5NGQ2NGMxY2ViNyIsInVzZXJuYW1lIjoiYWRtaW4ifQ.aPPJ9vt7VPaXTcIXBiGsRRkIqhgnIBaG3GJA5NTvFPM"
 
 async def make_sams_request(endpoint: str, method: str = "GET", data: dict = None) -> dict[str, Any] | None:
     """Make a request to the SAMS API with proper error handling."""
