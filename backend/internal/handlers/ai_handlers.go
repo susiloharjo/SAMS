@@ -393,12 +393,12 @@ Here's what I found:
 %s
 
 I can help you with questions about your assets, such as:
-• Asset summaries and totals
+• Asset summaries and total values (in Indonesian Rupiah)
 • Finding assets by category, department, or location
 • Asset status and maintenance information
 • Search for specific assets
 
-What would you like to know about your assets?`, req.Message, mcpResult)
+What would you like to know about your assets? Remember, all monetary values are presented in Indonesian Rupiah (Rp).`, req.Message, mcpResult)
 
 		return c.JSON(fiber.Map{
 			"response": fallbackResponse,
@@ -429,10 +429,10 @@ INSTRUCTIONS:
 3. Respond as if you naturally know this information about their assets
 4. If the data is empty or shows an error, politely explain that you couldn't find the information and suggest they try rephrasing their question
 5. Be helpful and friendly in your responses
-6. Format numbers and values clearly (e.g., use commas for large numbers, currency symbols)
+6. Format ALL currency values in Indonesian Rupiah (Rp) format with commas for thousands (e.g., "Rp5,000,000.00")
 7. If asked about specific assets, categories, or departments, provide the relevant information from the data
 
-Remember: You are a knowledgeable assistant who helps with asset management. Respond naturally without mentioning how you got the information.`,
+Remember: You are a knowledgeable assistant who helps with asset management. Respond naturally without mentioning how you got the information. Always present monetary values in Indonesian Rupiah (Rp).`,
 		req.Message, mcpResult)
 
 	log.Printf("HandleAIQuery: sending tool-enhanced prompt to Gemini: %s", enhancedPrompt)

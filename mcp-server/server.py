@@ -69,7 +69,7 @@ async def get_asset_summary() -> str:
     return (
         f"Asset Summary:\n"
         f"- Total Assets: {summary.get('total_assets', 'N/A')}\n"
-        f"- Total Value: ${summary.get('total_value', 0):,.2f}\n"
+        f"- Total Value: Rp{summary.get('total_value', 0):,.2f}\n"
         f"- Active Assets: {summary.get('active_assets', 'N/A')}\n"
         f"- Critical Assets: {summary.get('critical_assets', 'N/A')}"
     )
@@ -163,7 +163,7 @@ async def get_assets_by_status(status: str, limit: int = 20) -> str:
             f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
             f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
             f"  Department: {asset.get('department', {}).get('name', 'N/A')}\n"
-            f"  Current Value: ${asset.get('current_value', 0):,.2f}"
+            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}"
         )
     
     return f"Assets with Status '{status}' ({len(assets)} assets found):\n" + "\n".join(asset_list)
@@ -195,7 +195,7 @@ async def get_assets_by_category(category: str, limit: int = 20) -> str:
             f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
             f"  Status: {asset.get('status', 'N/A')}\n"
             f"  Department: {asset.get('department', {}).get('name', 'N/A')}\n"
-            f"  Current Value: ${asset.get('current_value', 0):,.2f}"
+            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}"
         )
     
     return f"Assets in Category '{category}' ({len(assets)} assets found):\n" + "\n".join(asset_list)
@@ -233,7 +233,7 @@ async def get_assets_by_department(department: str, limit: int = 20) -> str:
             f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
             f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
             f"  Status: {asset.get('status', 'N/A')}\n"
-            f"  Current Value: ${asset.get('current_value', 0):,.2f}"
+            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}"
         )
     
     return f"Assets in Department '{department}' ({len(filtered_assets)} assets found):\n" + "\n".join(asset_list)
@@ -264,8 +264,8 @@ async def get_asset_details(asset_id: str) -> str:
         f"- Category: {asset.get('category', {}).get('name', 'N/A')}\n"
         f"- Department: {asset.get('department', {}).get('name', 'N/A')}\n"
         f"- Acquisition Date: {asset.get('acquisition_date', 'N/A')}\n"
-        f"- Acquisition Cost: ${asset.get('acquisition_cost', 0):,.2f}\n"
-        f"- Current Value: ${asset.get('current_value', 0):,.2f}\n"
+        f"- Acquisition Cost: Rp{asset.get('acquisition_cost', 0):,.2f}\n"
+        f"- Current Value: Rp{asset.get('current_value', 0):,.2f}\n"
         f"- Location: {asset.get('location', 'N/A')}\n"
         f"- Building: {asset.get('building', 'N/A')}\n"
         f"- Room: {asset.get('room', 'N/A')}\n"
@@ -300,7 +300,7 @@ async def get_assets_by_value_range(min_value: float = 0, max_value: float = 100
     ]
     
     if not filtered_assets:
-        return f"No assets found with value between ${min_value:,.2f} and ${max_value:,.2f}."
+        return f"No assets found with value between Rp{min_value:,.2f} and Rp{max_value:,.2f}."
 
     asset_list = []
     for asset in filtered_assets:
@@ -309,11 +309,11 @@ async def get_assets_by_value_range(min_value: float = 0, max_value: float = 100
             f"  Name: {asset.get('name', 'N/A')}\n"
             f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
             f"  Department: {asset.get('department', {}).get('name', 'N/A')}\n"
-            f"  Current Value: ${asset.get('current_value', 0):,.2f}\n"
+            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}\n"
             f"  Status: {asset.get('status', 'N/A')}"
         )
     
-    return f"Assets with Value Between ${min_value:,.2f} and ${max_value:,.2f} ({len(filtered_assets)} assets found):\n" + "\n".join(asset_list)
+    return f"Assets with Value Between Rp{min_value:,.2f} and Rp{max_value:,.2f} ({len(filtered_assets)} assets found):\n" + "\n".join(asset_list)
 
 @mcp.tool()
 async def get_category_summary() -> str:
@@ -335,7 +335,7 @@ async def get_category_summary() -> str:
         category_list.append(
             f"- {category.get('category_name', 'Unknown')}: "
             f"{category.get('asset_count', 0)} assets, "
-            f"Total Value: ${category.get('total_value', 0):,.2f}"
+            f"Total Value: Rp{category.get('total_value', 0):,.2f}"
         )
     
     return "Assets by Category:\n" + "\n".join(category_list)
@@ -422,7 +422,7 @@ async def get_assets_by_location(location_query: str, limit: int = 20) -> str:
             f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
             f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
             f"  Status: {asset.get('status', 'N/A')}\n"
-            f"  Current Value: ${asset.get('current_value', 0):,.2f}\n"
+            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}\n"
             f"  {location_str}"
         )
     
@@ -478,7 +478,7 @@ async def get_assets_near_coordinates(latitude: float, longitude: float, radius_
             f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
             f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
             f"  Status: {asset.get('status', 'N/A')}\n"
-            f"  Current Value: ${asset.get('current_value', 0):,.2f}\n"
+            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}\n"
             f"  Coordinates: {asset.get('latitude')}, {asset.get('longitude')}\n"
             f"  Address: {asset.get('address', 'N/A')}"
         )

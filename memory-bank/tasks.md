@@ -135,7 +135,7 @@
 - ✅ **MCP Tool Integration**: Tool-based responses
 - ✅ **Department Queries**: "show me assets in Project department"
 - ✅ **Category Queries**: "total value of IT equipment"
-- ✅ **Asset Search**: "tell me about Samsung Galaxy Tab S7"
+
 
 ### **User Interface**
 - ✅ **Responsive Design**: Mobile and desktop optimized
