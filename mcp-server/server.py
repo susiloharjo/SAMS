@@ -483,60 +483,65 @@ async def get_assets_by_location(location_query: str, limit: int = 20) -> str:
         location_query: The location to search for (e.g., "Jakarta", "Building A", "Room 101", "Main Office").
         limit: Maximum number of results to return. Defaults to 20.
     """
-    logging.info(f"Executing get_assets_by_location tool with location_query='{location_query}' and limit={limit}")
-    data = await make_sams_request(f"/assets?limit={limit}&page=1")
+    logging.info(f"Executing get_assets_by_location tool (DB) query='{location_query}' limit={limit}")
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, name, serial_number, status, address, building_room, latitude, longitude
+                    FROM assets
+                    WHERE deleted_at IS NULL
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                    """,
+                    (limit,)
+                )
+                assets = cur.fetchall()
+        if not assets:
+            return "No assets found."
 
-    if not data or "data" not in data:
-        return f"Unable to fetch assets from SAMS API for location filtering."
+        # Filter by location
+        location_query_lower = location_query.lower()
+        filtered_assets = []
+        for asset in assets:
+            # rows: id, name, serial, status, address, building_room, lat, lon
+            address = (asset[4] or '').lower()
+            building_room = (asset[5] or '').lower()
+            if (location_query_lower in address or 
+                location_query_lower in building_room or
+                (location_query_lower in "jakarta" and "jakarta" in address) or
+                (location_query_lower in "office" and "office" in address) or
+                (location_query_lower in "building" and "building" in building_room) or
+                (location_query_lower in "room" and "room" in building_room)):
+                filtered_assets.append(asset)
 
-    assets = data["data"]
-    if not assets:
-        return "No assets found."
+        if not filtered_assets:
+            return f"No assets found at location '{location_query}'."
 
-    # Filter by location since the API doesn't support location filtering yet
-    location_query_lower = location_query.lower()
-    filtered_assets = []
-    
-    for asset in assets:
-        # Check address, building_room, and coordinates
-        address = asset.get('address', '').lower()
-        building_room = asset.get('building_room', '').lower()
-        
-        # Check if location query matches any location field
-        if (location_query_lower in address or 
-            location_query_lower in building_room or
-            (location_query_lower in "jakarta" and "jakarta" in address) or
-            (location_query_lower in "office" and "office" in address) or
-            (location_query_lower in "building" and "building" in building_room) or
-            (location_query_lower in "room" and "room" in building_room)):
-            filtered_assets.append(asset)
-    
-    if not filtered_assets:
-        return f"No assets found at location '{location_query}'."
+        asset_list = []
+        for asset in filtered_assets:
+            location_info = []
+            if asset[4]:
+                location_info.append(f"Address: {asset[4]}")
+            if asset[5]:
+                location_info.append(f"Building/Room: {asset[5]}")
+            if asset[6] is not None and asset[7] is not None:
+                location_info.append(f"Coordinates: {asset[6]}, {asset[7]}")
+            location_str = " | ".join(location_info) if location_info else "Location: N/A"
 
-    asset_list = []
-    for asset in filtered_assets:
-        location_info = []
-        if asset.get('address'):
-            location_info.append(f"Address: {asset.get('address')}")
-        if asset.get('building_room'):
-            location_info.append(f"Building/Room: {asset.get('building_room')}")
-        if asset.get('latitude') and asset.get('longitude'):
-            location_info.append(f"Coordinates: {asset.get('latitude')}, {asset.get('longitude')}")
-        
-        location_str = " | ".join(location_info) if location_info else "Location: N/A"
-        
-        asset_list.append(
-            f"- ID: {asset.get('id')}\n"
-            f"  Name: {asset.get('name', 'N/A')}\n"
-            f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
-            f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
-            f"  Status: {asset.get('status', 'N/A')}\n"
-            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}\n"
-            f"  {location_str}"
-        )
-    
-    return f"Assets at Location '{location_query}' ({len(filtered_assets)} assets found):\n" + "\n".join(asset_list)
+            asset_list.append(
+                f"- ID: {asset[0]}\n"
+                f"  Name: {asset[1]}\n"
+                f"  Serial Number: {asset[2] or 'N/A'}\n"
+                f"  Status: {asset[3] or 'N/A'}\n"
+                f"  {location_str}"
+            )
+
+        return f"Assets at Location '{location_query}' ({len(filtered_assets)} assets found):\n" + "\n".join(asset_list)
+    except Exception as e:
+        logging.error(f"DB location filter error: {e}")
+        return "Unable to filter assets by location from database."
 
 @mcp.tool()
 async def get_assets_near_coordinates(latitude: float, longitude: float, radius_km: float = 1.0, limit: int = 20) -> str:
@@ -549,51 +554,60 @@ async def get_assets_near_coordinates(latitude: float, longitude: float, radius_
         radius_km: Search radius in kilometers. Defaults to 1.0 km.
         limit: Maximum number of results to return. Defaults to 20.
     """
-    logging.info(f"Executing get_assets_near_coordinates tool with lat={latitude}, lon={longitude}, radius={radius_km}km, limit={limit}")
-    data = await make_sams_request(f"/assets?limit={limit}&page=1")
+    logging.info(f"Executing get_assets_near_coordinates tool (DB) lat={latitude}, lon={longitude}, radius={radius_km}km, limit={limit}")
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, name, serial_number, category_id, status, current_value, latitude, longitude, address
+                    FROM assets
+                    WHERE deleted_at IS NULL AND latitude IS NOT NULL AND longitude IS NOT NULL
+                    LIMIT %s
+                    """,
+                    (limit,)
+                )
+                assets = cur.fetchall()
+        if not assets:
+            return "No assets found."
 
-    if not data or "data" not in data:
-        return f"Unable to fetch assets from SAMS API for coordinate-based filtering."
+        # Filter assets by coordinate proximity
+        filtered_assets = []
+        for asset in assets:
+            # rows: id, name, serial, category_id, status, value, lat, lon, address
+            if asset[6] is not None and asset[7] is not None:
+                asset_lat = float(asset[6])
+                asset_lon = float(asset[7])
 
-    assets = data["data"]
-    if not assets:
-        return "No assets found."
+                # Simple distance calculation (approximate)
+                lat_diff = abs(asset_lat - latitude)
+                lon_diff = abs(asset_lon - longitude)
 
-    # Filter assets by coordinate proximity
-    filtered_assets = []
-    for asset in assets:
-        if asset.get('latitude') and asset.get('longitude'):
-            # Calculate distance using Haversine formula (simplified)
-            asset_lat = asset.get('latitude')
-            asset_lon = asset.get('longitude')
-            
-            # Simple distance calculation (approximate)
-            lat_diff = abs(asset_lat - latitude)
-            lon_diff = abs(asset_lon - longitude)
-            
-            # Rough conversion to km (1 degree ≈ 111 km)
-            distance_km = (lat_diff + lon_diff) * 111.0
-            
-            if distance_km <= radius_km:
-                filtered_assets.append(asset)
-    
-    if not filtered_assets:
-        return f"No assets found within {radius_km}km of coordinates ({latitude}, {longitude})."
+                # Rough conversion to km (1 degree ≈ 111 km)
+                distance_km = (lat_diff + lon_diff) * 111.0
 
-    asset_list = []
-    for asset in filtered_assets:
-        asset_list.append(
-            f"- ID: {asset.get('id')}\n"
-            f"  Name: {asset.get('name', 'N/A')}\n"
-            f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
-            f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
-            f"  Status: {asset.get('status', 'N/A')}\n"
-            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}\n"
-            f"  Coordinates: {asset.get('latitude')}, {asset.get('longitude')}\n"
-            f"  Address: {asset.get('address', 'N/A')}"
-        )
-    
-    return f"Assets within {radius_km}km of ({latitude}, {longitude}) ({len(filtered_assets)} assets found):\n" + "\n".join(asset_list)
+                if distance_km <= radius_km:
+                    filtered_assets.append(asset)
+
+        if not filtered_assets:
+            return f"No assets found within {radius_km}km of coordinates ({latitude}, {longitude})."
+
+        asset_list = []
+        for asset in filtered_assets:
+            asset_list.append(
+                f"- ID: {asset[0]}\n"
+                f"  Name: {asset[1]}\n"
+                f"  Serial Number: {asset[2] or 'N/A'}\n"
+                f"  Status: {asset[4] or 'N/A'}\n"
+                f"  Current Value: Rp{float(asset[5] or 0):,.2f}\n"
+                f"  Coordinates: {asset[6]}, {asset[7]}\n"
+                f"  Address: {asset[8] or 'N/A'}"
+            )
+
+        return f"Assets within {radius_km}km of ({latitude}, {longitude}) ({len(filtered_assets)} assets found):\n" + "\n".join(asset_list)
+    except Exception as e:
+        logging.error(f"DB near coordinates error: {e}")
+        return "Unable to compute nearby assets from database."
 
 # --- FastAPI HTTP Server ---
 
