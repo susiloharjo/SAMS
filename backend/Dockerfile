@@ -22,8 +22,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -a -installsuffix cgo -o main ./c
 # Final stage
 FROM alpine:latest
 
-# Install ca-certificates for HTTPS requests
-RUN apk --no-cache add ca-certificates
+# Install ca-certificates, postgresql-client for wait script
+RUN apk --no-cache add ca-certificates postgresql-client bash
 
 # Create non-root user
 RUN addgroup -g 1001 -S appgroup && \
@@ -35,11 +35,14 @@ WORKDIR /app
 # Copy binary from builder stage
 COPY --from=builder /app/main .
 
+# Copy wait script
+COPY ../wait-for-db.sh .
+
 # Copy .env file if it exists
 COPY .env* ./
 
-# Make binary executable
-RUN chmod +x main
+# Make scripts executable
+RUN chmod +x main wait-for-db.sh
 
 # Change ownership to non-root user
 RUN chown -R appuser:appgroup /app
@@ -50,5 +53,5 @@ USER appuser
 # Expose port
 EXPOSE 8081
 
-# Run the application
-CMD ["./main"]
+# Run the wait script then the application
+CMD ["sh", "-c", "./wait-for-db.sh && ./main"]

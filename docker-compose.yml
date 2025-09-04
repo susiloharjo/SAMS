@@ -13,7 +13,8 @@ services:
     #   - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+      - ./enable-uuid-extension.sql:/docker-entrypoint-initdb.d/01-enable-uuid-extension.sql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/02-init-db.sql
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
@@ -53,6 +54,11 @@ services:
         condition: service_healthy
       sams-redis:
         condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8081/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # SAMS Frontend
   sams-frontend:
@@ -88,7 +94,8 @@ services:
     ports:
       - "8082:8081"
     depends_on:
-      - sams-backend
+      sams-backend:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
