@@ -26,7 +26,7 @@ export default function AIChatPage() {
 • "What's the total value of IT equipment?"
 • "How many vehicles do we have?"
 • "Show me all active assets"
-• "Tell me about Samsung Galaxy Tab S7"
+
 
 How can I assist you today?`
     }
@@ -169,7 +169,6 @@ How can I assist you today?`
               "Find assets in Jakarta",
               "What's our total asset value?",
               "Show me maintenance assets",
-              "Tell me about Samsung Galaxy Tab S7",
               "Assets by department"
             ].map((suggestion, index) => (
               <button
