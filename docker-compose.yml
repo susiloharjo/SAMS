@@ -6,11 +6,11 @@ services:
     image: postgres:16-alpine
     container_name: sams-postgres
     environment:
-      - POSTGRES_USER=${DB_USER}
+      - POSTG-RES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - POSTGRES_DB=${DB_NAME}
-    ports:
-      - "${DB_PORT}:5432"
+    # ports:
+    #   - "${DB_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
@@ -28,21 +28,6 @@ services:
     ports:
       - "6380:6379"
     restart: unless-stopped
-
-  # # pgAdmin (Database Management)
-  # sams-pgadmin:
-  #   image: dpage/pgadmin4:latest
-  #   container_name: sams-pgadmin
-  #   environment:
-  #     PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-  #     PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
-  #   ports:
-  #     - "5051:80"
-  #   volumes:
-  #     - pgadmin_data:/var/lib/pgadmin
-  #   depends_on:
-  #     - sams-postgres
-  #   restart: unless-stopped
 
   # SAMS Backend
   sams-backend:
