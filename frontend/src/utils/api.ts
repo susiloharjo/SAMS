@@ -57,59 +57,39 @@ export const authenticatedFetch = async (
   url: string,
   options: RequestInit = {}
 ): Promise<Response> => {
+  // Get token from localStorage (should be set during login)
   let token = localStorage.getItem('access_token');
   
   // Check if token is expired and refresh if needed
   if (token && isTokenExpired(token)) {
+    console.log('Token expired, attempting to refresh...');
     const refreshed = await refreshTokenSilently();
     if (refreshed) {
+      console.log('Token refreshed successfully');
       token = localStorage.getItem('access_token');
     } else {
-      // Refresh failed, redirect to login
+      console.log('Token refresh failed, clearing auth data');
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       localStorage.removeItem('user');
-      window.location.href = '/login';
-      throw new Error('Authentication failed');
+      
+      // Don't redirect here to avoid loops, just let the request fail
+      // The AuthContext will handle redirection on its next check
     }
   }
-
-  // Add authorization header
+  
+  // Add authorization header with token
   const headers = {
     'Content-Type': 'application/json',
-    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(token && { 'Authorization': `Bearer ${token}` }),
     ...options.headers,
   };
 
+  // Make the request with the token
   const response = await fetch(url, {
     ...options,
     headers,
   });
-
-  // If unauthorized, try to refresh token once more
-  if (response.status === 401) {
-    const refreshed = await refreshTokenSilently();
-    if (refreshed) {
-      token = localStorage.getItem('access_token');
-      const retryHeaders = {
-        'Content-Type': 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` }),
-        ...options.headers,
-      };
-      
-      return fetch(url, {
-        ...options,
-        headers: retryHeaders,
-      });
-    } else {
-      // Refresh failed, redirect to login
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-      throw new Error('Authentication failed');
-    }
-  }
 
   return response;
 };

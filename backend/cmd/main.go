@@ -6,7 +6,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
-	"github.com/joho/godotenv"
 
 	"sams-backend/internal/database"
 	"sams-backend/internal/handlers"
@@ -15,13 +14,13 @@ import (
 )
 
 func main() {
-	// Load environment variables from root directory
-	if err := godotenv.Load("../.env"); err != nil {
-		log.Println("No root .env file found, trying current directory")
-		if err := godotenv.Load(); err != nil {
-			log.Println("No .env file found, using system environment variables")
-		}
-	}
+	// Removed godotenv.Load() calls to ensure Docker environment variables are used
+	// if err := godotenv.Load("../.env"); err != nil {
+	// 	log.Println("No root .env file found, trying current directory")
+	// 	if err := godotenv.Load(); err != nil {
+	// 		log.Println("No .env file found, using system environment variables")
+	// 	}
+	// }
 
 	// Initialize database
 	db, err := database.InitDB()
@@ -75,6 +74,25 @@ func main() {
 			"status":  "healthy",
 			"service": "SAMS Backend",
 			"version": "1.0.0",
+		})
+	})
+
+	// Test login endpoint (temporary for debugging)
+	app.Post("/api/v1/test-login", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status":  "success",
+			"message": "Test login endpoint working",
+			"data": fiber.Map{
+				"user": fiber.Map{
+					"id":         "test-123",
+					"username":   "test",
+					"role":       "admin",
+					"first_name": "Test",
+					"last_name":  "User",
+				},
+				"access_token":  "test-token-123",
+				"refresh_token": "test-refresh-123",
+			},
 		})
 	})
 

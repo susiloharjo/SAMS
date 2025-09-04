@@ -53,7 +53,7 @@ The system comes with pre-configured demo accounts for testing:
 
 | Role | Username | Password | Access Level |
 |------|----------|----------|--------------|
-| **Admin** | `admin` | `admin123` | Full system access, user management |
+| **Admin** | `admin` | `user.1001` | Full system access, user management |
 | **Manager** | `manager` | `manager123` | Asset CRUD, categories, departments, AI assistant |
 | **User** | `user` | `user123` | View-only access to assets and reports |
 

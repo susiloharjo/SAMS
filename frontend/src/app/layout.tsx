@@ -15,8 +15,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     logout()
   }
 
-  // Don't show sidebar on login page
-  if (pathname === '/login') {
+  // Don't show sidebar on login pages
+  if (pathname === '/login' || pathname === '/simple-login' || pathname === '/test-login' || pathname === '/debug') {
     return <>{children}</>
   }
 

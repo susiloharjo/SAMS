@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface LoginForm {
   username: string;
@@ -34,12 +35,13 @@ interface LoginResponse {
 export default function LoginPage() {
   const [formData, setFormData] = useState<LoginForm>({
     username: 'admin',
-    password: 'admin123',
+    password: 'user.1001',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,32 +49,12 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      if (data.error) {
-        throw new Error(data.message || 'Login failed');
-      }
-
-      // Store tokens in localStorage
-      localStorage.setItem('access_token', data.data.access_token);
-      localStorage.setItem('refresh_token', data.data.refresh_token);
-      localStorage.setItem('user', JSON.stringify(data.data.user));
-
-      // Redirect to assets page
+      console.log('Attempting login with:', formData);
+      await login(formData.username, formData.password);
+      console.log('Login successful, redirecting to assets');
       router.push('/assets');
     } catch (err) {
+      console.error('Login error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred during login');
     } finally {
       setLoading(false);
@@ -90,6 +72,23 @@ export default function LoginPage() {
   const fillCredentials = (username: string, password: string) => {
     setFormData({ username, password });
     setError('');
+  };
+
+  const clearStorage = () => {
+    // Clear all possible auth-related storage
+    localStorage.clear();
+    sessionStorage.clear();
+    
+    // Clear specific items
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user');
+    
+    setError('');
+    alert('All storage cleared! Please try logging in again.');
+    
+    // Force page reload to completely reset state
+    window.location.reload();
   };
 
   return (
@@ -176,7 +175,7 @@ export default function LoginPage() {
             </div>
           )}
 
-          <div>
+          <div className="space-y-3">
             <button
               type="submit"
               disabled={loading}
@@ -193,6 +192,17 @@ export default function LoginPage() {
                 </svg>
               )}
               {loading ? 'Signing in...' : 'Sign in'}
+            </button>
+            
+            <button
+              type="button"
+              onClick={clearStorage}
+              className="w-full flex justify-center py-2 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Clear Storage & Retry
             </button>
           </div>
 

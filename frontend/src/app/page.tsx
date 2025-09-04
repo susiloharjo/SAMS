@@ -1,10 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
 import { formatIDR, formatIDRCompact } from '../utils/currency'
 import { api } from '../utils/api'
 import { ProtectedRoute } from '../components/auth/ProtectedRoute'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Asset {
   id: string
@@ -46,6 +48,9 @@ interface AssetSummary {
 }
 
 export default function Dashboard() {
+  const { isAuthenticated, isLoading } = useAuth()
+  const router = useRouter()
+  
   const [recentAssets, setRecentAssets] = useState<Asset[]>([])
   const [summary, setSummary] = useState<AssetSummary>({
     total_assets: 0,
@@ -58,9 +63,21 @@ export default function Dashboard() {
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    fetchDashboardData()
-  }, [])
+    if (!isLoading && !isAuthenticated) {
+      console.log('Dashboard: Not authenticated, redirecting to login')
+      router.push('/login')
+      return
+    }
+  }, [isAuthenticated, isLoading, router])
+
+  useEffect(() => {
+    // Only fetch data if authenticated
+    if (isAuthenticated) {
+      fetchDashboardData()
+    }
+  }, [isAuthenticated])
 
   const fetchDashboardData = async () => {
     try {

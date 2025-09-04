@@ -68,7 +68,10 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	// Update last login
 	now := time.Now()
 	user.LastLogin = &now
-	h.db.Save(&user)
+
+	// Use Update instead of Save to only update the LastLogin field
+	// This prevents foreign key constraint issues with department_id
+	h.db.Model(&user).UpdateColumn("last_login", &now)
 
 	// Generate JWT token
 	accessToken, err := h.generateJWT(user)
@@ -115,8 +118,8 @@ func (h *AuthHandler) Login(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"error": false,
-		"data":  response,
+		"error":   false,
+		"data":    response,
 		"message": "Login successful",
 	})
 }
@@ -210,8 +213,8 @@ func (h *AuthHandler) RefreshToken(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"error": false,
-		"data":  response,
+		"error":   false,
+		"data":    response,
 		"message": "Token refreshed successfully",
 	})
 }
@@ -290,9 +293,6 @@ func (h *AuthHandler) Logout(c *fiber.Ctx) error {
 func (h *AuthHandler) generateJWT(user models.User) (string, error) {
 	// Get JWT secret from environment
 	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		jwtSecret = "default-secret-key-change-in-production"
-	}
 
 	// Get token expiration from environment (default: 24 hours)
 	expirationStr := os.Getenv("JWT_EXPIRATION_HOURS")
@@ -323,7 +323,8 @@ func (h *AuthHandler) generateRefreshToken(user models.User) (string, error) {
 	// Get JWT refresh secret from environment
 	jwtRefreshSecret := os.Getenv("JWT_REFRESH_SECRET")
 	if jwtRefreshSecret == "" {
-		jwtRefreshSecret = "default-refresh-secret-key-change-in-production"
+		// If no specific refresh secret is set, use the same as the main JWT secret
+		jwtRefreshSecret = os.Getenv("JWT_SECRET")
 	}
 
 	// Refresh tokens last longer (default: 7 days)
@@ -338,7 +339,7 @@ func (h *AuthHandler) generateRefreshToken(user models.User) (string, error) {
 	// Create claims
 	expirationTime := time.Now().AddDate(0, 0, expirationDays)
 	claims := jwt.MapClaims{
-		"user_id": user.ID.String(),
+		"user_id":  user.ID.String(),
 		"username": user.Username,
 		"role":     user.Role,
 		"exp":      expirationTime.Unix(),
