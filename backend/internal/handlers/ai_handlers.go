@@ -247,15 +247,15 @@ func determineMCPTool(message string) (string, map[string]interface{}) {
 		strings.Contains(lowerMessage, "total worth") || strings.Contains(lowerMessage, "value of") ||
 		strings.Contains(lowerMessage, "cost of") || strings.Contains(lowerMessage, "worth of") {
 
-		// If asking about specific category value, use category tool
+		// If asking about specific category value, use category total value tool
 		if strings.Contains(lowerMessage, "it") || strings.Contains(lowerMessage, "it equipment") {
-			return "get_assets_by_category", map[string]interface{}{"category": "IT Equipment", "limit": 50}
+			return "get_category_total_value", map[string]interface{}{"category": "IT Equipment"}
 		}
 		if strings.Contains(lowerMessage, "vehicle") || strings.Contains(lowerMessage, "vehicles") {
-			return "get_assets_by_category", map[string]interface{}{"category": "Vehicles", "limit": 50}
+			return "get_category_total_value", map[string]interface{}{"category": "Vehicles"}
 		}
 		if strings.Contains(lowerMessage, "tool") || strings.Contains(lowerMessage, "tools") {
-			return "get_assets_by_category", map[string]interface{}{"category": "Tools", "limit": 50}
+			return "get_category_total_value", map[string]interface{}{"category": "Tools"}
 		}
 
 		// For general value queries, get all assets to calculate total

@@ -1,5 +1,4 @@
 from typing import Any
-import httpx
 from mcp.server.fastmcp import FastMCP
 import logging
 from fastapi import FastAPI, HTTPException, Request
@@ -23,10 +22,7 @@ mcp = FastMCP(
     # description="Provides tools to query the Smart Asset Management System (SAMS)."
 )
 
-# Configuration
-SAMS_API_BASE = "http://sams-backend:8081/api/v1"
-# SAMS_API_BASE = os.getenv("SAMS_API_BASE", "http://sams-backend:8080/api/v1")
-print(f"SAMS_API_BASE set to: {SAMS_API_BASE}")
+# Configuration - Direct database access (no API needed)
 USER_AGENT = "sams-mcp-server/1.0"
 
 # No authentication token needed
@@ -42,38 +38,7 @@ def get_db_conn():
     return psycopg.connect(dsn, autocommit=True)
 
 
-async def make_sams_request(endpoint: str, method: str = "GET", data: dict = None, auth_header: str = "") -> dict[str, Any] | None:
-    """Make a request to the SAMS API with proper error handling."""
-    url = f"{SAMS_API_BASE}{endpoint}"
-    headers = {
-        "User-Agent": USER_AGENT, 
-        "Content-Type": "application/json"
-    }
-    # Prefer explicit auth header; otherwise use service token if provided
-    service_token = os.getenv("MCP_SERVICE_TOKEN", "")
-    token_to_use = auth_header if auth_header else (f"Bearer {service_token}" if service_token else "")
-    if token_to_use:
-        headers["Authorization"] = token_to_use
-    
-    async with httpx.AsyncClient() as client:
-        try:
-            logging.info(f"Making {method} request to SAMS API: {url}")
-            if method == "GET":
-                response = await client.get(url, headers=headers, timeout=10.0)
-            elif method == "POST":
-                response = await client.post(url, headers=headers, json=data, timeout=10.0)
-            else:
-                response = await client.get(url, headers=headers, timeout=10.0)
-            
-            response.raise_for_status()
-            logging.info(f"Request to {url} successful with status {response.status_code}")
-            return response.json()
-        except httpx.RequestError as exc:
-            logging.error(f"An error occurred while requesting {exc.request.url!r}: {exc!r}")
-            return None
-        except httpx.HTTPStatusError as exc:
-            logging.error(f"Error response {exc.response.status_code} while requesting {exc.request.url!r}: {exc.response.text!r}")
-            return None
+# Removed make_sams_request function - now using direct database queries
 
 @mcp.tool()
 async def get_asset_summary() -> str:
@@ -96,7 +61,7 @@ async def get_asset_summary() -> str:
         return (
             f"Asset Summary:\n"
             f"- Total Assets: {total_assets}\n"
-            f"- Total Value: Rp{total_value:,.2f}\n"
+            f"- Total Value: Rp {total_value:,.2f}\n"
             f"- Active Assets: {active_assets}\n"
             f"- Critical Assets: {critical_assets}"
         )
@@ -273,7 +238,7 @@ async def get_assets_by_category(category: str, limit: int = 20) -> str:
                 category_id = row[0]
                 cur.execute(
                     """
-                    SELECT id, name, serial_number, status
+                    SELECT id, name, serial_number, status, current_value
                     FROM assets
                     WHERE deleted_at IS NULL AND category_id = %s
                     ORDER BY created_at DESC
@@ -285,13 +250,60 @@ async def get_assets_by_category(category: str, limit: int = 20) -> str:
         if not rows:
             return f"No assets found in category '{category}'."
         asset_list = [
-            f"- ID: {r[0]}\n  Name: {r[1]}\n  Serial Number: {r[2] or 'N/A'}\n  Status: {r[3] or 'N/A'}"
+            f"- ID: {r[0]}\n  Name: {r[1]}\n  Serial Number: {r[2] or 'N/A'}\n  Status: {r[3] or 'N/A'}\n  Value: Rp {float(r[4] or 0):,.2f}"
             for r in rows
         ]
         return f"Assets in Category '{category}' ({len(rows)} assets found):\n" + "\n".join(asset_list)
     except Exception as e:
         logging.error(f"DB category list error: {e}")
         return f"Unable to fetch category '{category}' assets from database."
+
+@mcp.tool()
+async def get_category_total_value(category: str) -> str:
+    """
+    Get the total value of all assets in a specific category.
+
+    Args:
+        category: The category name to calculate total value for.
+    """
+    logging.info(f"Executing get_category_total_value tool (DB) category='{category}'")
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM categories WHERE name = %s", (category,))
+                row = cur.fetchone()
+                if not row:
+                    return f"Category '{category}' not found."
+                category_id = row[0]
+                cur.execute(
+                    """
+                    SELECT 
+                        COUNT(id) as asset_count,
+                        COALESCE(SUM(current_value), 0) as total_value,
+                        COALESCE(AVG(current_value), 0) as avg_value,
+                        COALESCE(MIN(current_value), 0) as min_value,
+                        COALESCE(MAX(current_value), 0) as max_value
+                    FROM assets
+                    WHERE deleted_at IS NULL AND category_id = %s
+                    """,
+                    (category_id,)
+                )
+                result = cur.fetchone()
+        if not result:
+            return f"No assets found in category '{category}'."
+        
+        count, total, avg, min_val, max_val = result
+        return (
+            f"Category '{category}' Value Summary:\n"
+            f"- Total Assets: {count}\n"
+            f"- Total Value: Rp {float(total):,.2f}\n"
+            f"- Average Value: Rp {float(avg):,.2f}\n"
+            f"- Minimum Value: Rp {float(min_val):,.2f}\n"
+            f"- Maximum Value: Rp {float(max_val):,.2f}"
+        )
+    except Exception as e:
+        logging.error(f"DB category total value error: {e}")
+        return f"Unable to calculate total value for category '{category}' from database."
 
 @mcp.tool()
 async def get_assets_by_department(department: str, limit: int = 20) -> str:
@@ -326,7 +338,7 @@ async def get_assets_by_department(department: str, limit: int = 20) -> str:
             f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
             f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
             f"  Status: {asset.get('status', 'N/A')}\n"
-            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}"
+            f"  Current Value: Rp {asset.get('current_value', 0):,.2f}"
         )
     
     return f"Assets in Department '{department}' ({len(filtered_assets)} assets found):\n" + "\n".join(asset_list)
@@ -364,8 +376,8 @@ async def get_asset_details(asset_id: str) -> str:
             f"- Description: {desc or 'N/A'}\n"
             f"- Status: {status or 'N/A'}\n"
             f"- Acquisition Date: {acq_date or 'N/A'}\n"
-            f"- Acquisition Cost: Rp{float(acq_cost or 0):,.2f}\n"
-            f"- Current Value: Rp{float(curr_val or 0):,.2f}\n"
+            f"- Acquisition Cost: Rp {float(acq_cost or 0):,.2f}\n"
+            f"- Current Value: Rp {float(curr_val or 0):,.2f}\n"
             f"- Criticality: {criticality or 'N/A'}\n"
             f"- Condition: {condition or 'N/A'}"
         )
@@ -400,7 +412,7 @@ async def get_assets_by_value_range(min_value: float = 0, max_value: float = 100
     ]
     
     if not filtered_assets:
-        return f"No assets found with value between Rp{min_value:,.2f} and Rp{max_value:,.2f}."
+        return f"No assets found with value between Rp {min_value:,.2f} and Rp {max_value:,.2f}."
 
     asset_list = []
     for asset in filtered_assets:
@@ -409,11 +421,11 @@ async def get_assets_by_value_range(min_value: float = 0, max_value: float = 100
             f"  Name: {asset.get('name', 'N/A')}\n"
             f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
             f"  Department: {asset.get('department', {}).get('name', 'N/A')}\n"
-            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}\n"
+            f"  Current Value: Rp {asset.get('current_value', 0):,.2f}\n"
             f"  Status: {asset.get('status', 'N/A')}"
         )
     
-    return f"Assets with Value Between Rp{min_value:,.2f} and Rp{max_value:,.2f} ({len(filtered_assets)} assets found):\n" + "\n".join(asset_list)
+    return f"Assets with Value Between Rp {min_value:,.2f} and Rp {max_value:,.2f} ({len(filtered_assets)} assets found):\n" + "\n".join(asset_list)
 
 @mcp.tool()
 async def get_category_summary() -> str:
@@ -439,7 +451,7 @@ async def get_category_summary() -> str:
         if not rows:
             return "No category data found."
         category_list = [
-            f"- {r[0]}: {r[1]} assets, Total Value: Rp{float(r[2]):,.2f}"
+            f"- {r[0]}: {r[1]} assets, Total Value: Rp {float(r[2]):,.2f}"
             for r in rows
         ]
         return "Assets by Category:\n" + "\n".join(category_list)
@@ -599,7 +611,7 @@ async def get_assets_near_coordinates(latitude: float, longitude: float, radius_
                 f"  Name: {asset[1]}\n"
                 f"  Serial Number: {asset[2] or 'N/A'}\n"
                 f"  Status: {asset[4] or 'N/A'}\n"
-                f"  Current Value: Rp{float(asset[5] or 0):,.2f}\n"
+                f"  Current Value: Rp {float(asset[5] or 0):,.2f}\n"
                 f"  Coordinates: {asset[6]}, {asset[7]}\n"
                 f"  Address: {asset[8] or 'N/A'}"
             )
@@ -637,6 +649,7 @@ async def list_tools():
                 'search_assets_by_name': search_assets_by_name,
                 'get_assets_by_status': get_assets_by_status,
                 'get_assets_by_category': get_assets_by_category,
+                'get_category_total_value': get_category_total_value,
                 'get_assets_by_department': get_assets_by_department,
                 'get_asset_details': get_asset_details,
                 'get_assets_by_value_range': get_assets_by_value_range,
@@ -691,6 +704,7 @@ async def call_tool(tool_name: str, params: dict[str, Any], request: Request):
         'search_assets_by_name': search_assets_by_name,
         'get_assets_by_status': get_assets_by_status,
         'get_assets_by_category': get_assets_by_category,
+        'get_category_total_value': get_category_total_value,
         'get_assets_by_department': get_assets_by_department,
         'get_asset_details': get_asset_details,
         'get_assets_by_value_range': get_assets_by_value_range,
