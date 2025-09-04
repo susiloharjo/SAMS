@@ -2,10 +2,12 @@ from typing import Any
 import httpx
 from mcp.server.fastmcp import FastMCP
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 import uvicorn
 import inspect
+import os
 from dotenv import load_dotenv
+import psycopg
 
 # Load environment variables from the root .env file
 load_dotenv(dotenv_path='../.env')
@@ -27,18 +29,31 @@ SAMS_API_BASE = "http://sams-backend:8081/api/v1"
 print(f"SAMS_API_BASE set to: {SAMS_API_BASE}")
 USER_AGENT = "sams-mcp-server/1.0"
 
-# Service account token for MCP server (admin user token)
-# This token is generated using the same JWT_SECRET as the backend: "paErBaRxrU0kBKmTf/m29shbke9uOvtVdCOAJYuXnM0="
-SERVICE_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE5OTk5OTk5OTksImlhdCI6MTY5MzUwNDc3OSwicm9sZSI6ImFkbWluIiwidXNlcl9pZCI6ImNkNzg3NGE5LWEwOGQtNDI5Mi04YmVmLWU5NGQ2NGMxY2ViNyIsInVzZXJuYW1lIjoiYWRtaW4ifQ.aPPJ9vt7VPaXTcIXBiGsRRkIqhgnIBaG3GJA5NTvFPM"
+# No authentication token needed
+def get_db_conn():
+    """Create a new read-only DB connection using env credentials."""
+    dsn = (
+        f"host={os.getenv('DB_HOST','sams-postgres')} "
+        f"port={os.getenv('DB_PORT','5432')} "
+        f"dbname={os.getenv('DB_NAME','sams_db')} "
+        f"user={os.getenv('DB_USER','sams_user')} "
+        f"password={os.getenv('DB_PASSWORD','sams_password')}"
+    )
+    return psycopg.connect(dsn, autocommit=True)
 
-async def make_sams_request(endpoint: str, method: str = "GET", data: dict = None) -> dict[str, Any] | None:
+
+async def make_sams_request(endpoint: str, method: str = "GET", data: dict = None, auth_header: str = "") -> dict[str, Any] | None:
     """Make a request to the SAMS API with proper error handling."""
     url = f"{SAMS_API_BASE}{endpoint}"
     headers = {
         "User-Agent": USER_AGENT, 
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {SERVICE_TOKEN}"
+        "Content-Type": "application/json"
     }
+    # Prefer explicit auth header; otherwise use service token if provided
+    service_token = os.getenv("MCP_SERVICE_TOKEN", "")
+    token_to_use = auth_header if auth_header else (f"Bearer {service_token}" if service_token else "")
+    if token_to_use:
+        headers["Authorization"] = token_to_use
     
     async with httpx.AsyncClient() as client:
         try:
@@ -66,20 +81,28 @@ async def get_asset_summary() -> str:
     Retrieves a summary of all assets in the SAMS database.
     This includes total number of assets, total value, number of active assets, and number of critical assets.
     """
-    logging.info("Executing get_asset_summary tool")
-    data = await make_sams_request("/assets/summary")
-
-    if not data or not data.get("data"):
-        return "Unable to fetch asset summary from SAMS API."
-
-    summary = data["data"]
-    return (
-        f"Asset Summary:\n"
-        f"- Total Assets: {summary.get('total_assets', 'N/A')}\n"
-        f"- Total Value: Rp{summary.get('total_value', 0):,.2f}\n"
-        f"- Active Assets: {summary.get('active_assets', 'N/A')}\n"
-        f"- Critical Assets: {summary.get('critical_assets', 'N/A')}"
-    )
+    logging.info("Executing get_asset_summary tool (DB)")
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL")
+                total_assets = cur.fetchone()[0]
+                cur.execute("SELECT COALESCE(SUM(current_value),0) FROM assets WHERE deleted_at IS NULL")
+                total_value = float(cur.fetchone()[0])
+                cur.execute("SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL AND status='active'")
+                active_assets = cur.fetchone()[0]
+                cur.execute("SELECT COUNT(*) FROM assets WHERE deleted_at IS NULL AND criticality='critical'")
+                critical_assets = cur.fetchone()[0]
+        return (
+            f"Asset Summary:\n"
+            f"- Total Assets: {total_assets}\n"
+            f"- Total Value: Rp{total_value:,.2f}\n"
+            f"- Active Assets: {active_assets}\n"
+            f"- Critical Assets: {critical_assets}"
+        )
+    except Exception as e:
+        logging.error(f"DB summary error: {e}")
+        return "Unable to compute asset summary from database."
 
 @mcp.tool()
 async def get_recent_assets(limit: int = 5) -> str:
@@ -89,29 +112,34 @@ async def get_recent_assets(limit: int = 5) -> str:
     Args:
         limit: The number of recent assets to retrieve. Defaults to 5.
     """
-    logging.info(f"Executing get_recent_assets tool with limit={limit}")
-    data = await make_sams_request(f"/assets?limit={limit}&page=1")
-
-    if not data or "data" not in data:
-        return "Unable to fetch recent assets from SAMS API."
-
-    assets = data["data"]
-    if not assets:
-        return "No recent assets found."
-
-    asset_list = []
-    for asset in assets:
-        asset_list.append(
-            f"- ID: {asset.get('id')}\n"
-            f"  Name: {asset.get('name', 'N/A')}\n"
-            f"  Status: {asset.get('status', 'N/A')}\n"
-            f"  Acquisition Date: {asset.get('acquisition_date', 'N/A')}"
-        )
-    
-    return "Most Recent Assets:\n" + "\n".join(asset_list)
+    logging.info(f"Executing get_recent_assets tool (DB) limit={limit}")
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, name, status, acquisition_date
+                    FROM assets
+                    WHERE deleted_at IS NULL
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                    """,
+                    (limit,)
+                )
+                rows = cur.fetchall()
+        if not rows:
+            return "No recent assets found."
+        asset_list = [
+            f"- ID: {r[0]}\n  Name: {r[1]}\n  Status: {r[2]}\n  Acquisition Date: {r[3] or 'N/A'}"
+            for r in rows
+        ]
+        return "Most Recent Assets:\n" + "\n".join(asset_list)
+    except Exception as e:
+        logging.error(f"DB recent assets error: {e}")
+        return "Unable to fetch recent assets from database."
 
 @mcp.tool()
-async def search_assets(query: str, limit: int = 10) -> str:
+async def search_assets(query: str, limit: int = 10, auth_header: str = "") -> str:
     """
     Search for assets by name, serial number, model, or description.
 
@@ -119,29 +147,76 @@ async def search_assets(query: str, limit: int = 10) -> str:
         query: The search term to look for in asset names, serial numbers, models, or descriptions.
         limit: Maximum number of results to return. Defaults to 10.
     """
-    logging.info(f"Executing search_assets tool with query='{query}' and limit={limit}")
-    data = await make_sams_request(f"/assets?search={query}&limit={limit}&page=1")
+    logging.info(f"Executing search_assets tool (DB) query='{query}' limit={limit}")
+    try:
+        like = f"%{query}%"
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, name, serial_number, model, status
+                    FROM assets
+                    WHERE deleted_at IS NULL AND (
+                        name ILIKE %s OR serial_number ILIKE %s OR model ILIKE %s OR description ILIKE %s
+                    )
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                    """,
+                    (like, like, like, like, limit)
+                )
+                rows = cur.fetchall()
+        if not rows:
+            return f"No assets found matching the query '{query}'."
+        asset_list = [
+            f"- ID: {r[0]}\n  Name: {r[1]}\n  Serial Number: {r[2] or 'N/A'}\n  Model: {r[3] or 'N/A'}\n  Status: {r[4] or 'N/A'}"
+            for r in rows
+        ]
+        return f"Search Results for '{query}' ({len(rows)} assets found):\n" + "\n".join(asset_list)
+    except Exception as e:
+        logging.error(f"DB search error: {e}")
+        return f"Unable to search assets in database for '{query}'."
 
-    if not data or "data" not in data:
-        return f"Unable to search assets with query '{query}' from SAMS API."
+@mcp.tool()
+async def search_assets_by_name(asset_name: str, limit: int = 10, auth_header: str = "") -> str:
+    """
+    Search for assets by exact name or partial name match.
+    This function searches specifically by asset name field.
 
-    assets = data["data"]
-    if not assets:
-        return f"No assets found matching the query '{query}'."
-
-    asset_list = []
-    for asset in assets:
-        asset_list.append(
-            f"- ID: {asset.get('id')}\n"
-            f"  Name: {asset.get('name', 'N/A')}\n"
-            f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
-            f"  Model: {asset.get('model', 'N/A')}\n"
-            f"  Status: {asset.get('status', 'N/A')}\n"
-            f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
-            f"  Department: {asset.get('department', {}).get('name', 'N/A')}"
-        )
+    Args:
+        asset_name: The name of the asset to search for (can be partial).
+        limit: Maximum number of results to return. Defaults to 10.
+    """
+    logging.info(f"Executing search_assets_by_name tool with asset_name='{asset_name}' and limit={limit}")
     
-    return f"Search Results for '{query}' ({len(assets)} assets found):\n" + "\n".join(asset_list)
+    # Direct DB query (ILIKE on name, serial_number, model, description)
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT a.id, a.name, a.serial_number, a.model, a.status
+                    FROM assets a
+                    WHERE a.deleted_at IS NULL AND (
+                        a.name ILIKE %s OR a.serial_number ILIKE %s OR a.model ILIKE %s OR a.description ILIKE %s
+                    )
+                    ORDER BY a.created_at DESC
+                    LIMIT %s
+                    """,
+                    (f"%{asset_name}%", f"%{asset_name}%", f"%{asset_name}%", f"%{asset_name}%", limit),
+                )
+                rows = cur.fetchall()
+                if not rows:
+                    return f"No assets found matching the name '{asset_name}'."
+                asset_list = []
+                for row in rows:
+                    aid, name, sn, model, status = row
+                    asset_list.append(
+                        f"- ID: {aid}\n  Name: {name or 'N/A'}\n  Serial Number: {sn or 'N/A'}\n  Model: {model or 'N/A'}\n  Status: {status or 'N/A'}"
+                    )
+                return f"Assets found matching '{asset_name}' ({len(rows)} assets):\n" + "\n".join(asset_list)
+    except Exception as e:
+        logging.error(f"DB search error: {e}")
+        return "Unable to query assets directly from the database."
 
 @mcp.tool()
 async def get_assets_by_status(status: str, limit: int = 20) -> str:
@@ -152,28 +227,31 @@ async def get_assets_by_status(status: str, limit: int = 20) -> str:
         status: The status to filter by (Active, Inactive, Maintenance, Disposed).
         limit: Maximum number of results to return. Defaults to 20.
     """
-    logging.info(f"Executing get_assets_by_status tool with status='{status}' and limit={limit}")
-    data = await make_sams_request(f"/assets?status={status}&limit={limit}&page=1")
-
-    if not data or "data" not in data:
-        return f"Unable to fetch assets with status '{status}' from SAMS API."
-
-    assets = data["data"]
-    if not assets:
-        return f"No assets found with status '{status}'."
-
-    asset_list = []
-    for asset in assets:
-        asset_list.append(
-            f"- ID: {asset.get('id')}\n"
-            f"  Name: {asset.get('name', 'N/A')}\n"
-            f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
-            f"  Category: {asset.get('category', {}).get('name', 'N/A')}\n"
-            f"  Department: {asset.get('department', {}).get('name', 'N/A')}\n"
-            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}"
-        )
-    
-    return f"Assets with Status '{status}' ({len(assets)} assets found):\n" + "\n".join(asset_list)
+    logging.info(f"Executing get_assets_by_status tool (DB) status='{status}' limit={limit}")
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, name, serial_number, model, status
+                    FROM assets
+                    WHERE deleted_at IS NULL AND status = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                    """,
+                    (status, limit)
+                )
+                rows = cur.fetchall()
+        if not rows:
+            return f"No assets found with status '{status}'."
+        asset_list = [
+            f"- ID: {r[0]}\n  Name: {r[1]}\n  Serial Number: {r[2] or 'N/A'}\n  Model: {r[3] or 'N/A'}\n  Status: {r[4] or 'N/A'}"
+            for r in rows
+        ]
+        return f"Assets with Status '{status}' ({len(rows)} assets found):\n" + "\n".join(asset_list)
+    except Exception as e:
+        logging.error(f"DB status list error: {e}")
+        return f"Unable to fetch assets with status '{status}' from database."
 
 @mcp.tool()
 async def get_assets_by_category(category: str, limit: int = 20) -> str:
@@ -184,28 +262,36 @@ async def get_assets_by_category(category: str, limit: int = 20) -> str:
         category: The category name to filter by.
         limit: Maximum number of results to return. Defaults to 20.
     """
-    logging.info(f"Executing get_assets_by_category tool with category='{category}' and limit={limit}")
-    data = await make_sams_request(f"/assets?category={category}&limit={limit}&page=1")
-
-    if not data or "data" not in data:
-        return f"Unable to fetch assets in category '{category}' from SAMS API."
-
-    assets = data["data"]
-    if not assets:
-        return f"No assets found in category '{category}'."
-
-    asset_list = []
-    for asset in assets:
-        asset_list.append(
-            f"- ID: {asset.get('id')}\n"
-            f"  Name: {asset.get('name', 'N/A')}\n"
-            f"  Serial Number: {asset.get('serial_number', 'N/A')}\n"
-            f"  Status: {asset.get('status', 'N/A')}\n"
-            f"  Department: {asset.get('department', {}).get('name', 'N/A')}\n"
-            f"  Current Value: Rp{asset.get('current_value', 0):,.2f}"
-        )
-    
-    return f"Assets in Category '{category}' ({len(assets)} assets found):\n" + "\n".join(asset_list)
+    logging.info(f"Executing get_assets_by_category tool (DB) category='{category}' limit={limit}")
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id FROM categories WHERE name = %s", (category,))
+                row = cur.fetchone()
+                if not row:
+                    return f"No assets found in category '{category}'."
+                category_id = row[0]
+                cur.execute(
+                    """
+                    SELECT id, name, serial_number, status
+                    FROM assets
+                    WHERE deleted_at IS NULL AND category_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                    """,
+                    (category_id, limit)
+                )
+                rows = cur.fetchall()
+        if not rows:
+            return f"No assets found in category '{category}'."
+        asset_list = [
+            f"- ID: {r[0]}\n  Name: {r[1]}\n  Serial Number: {r[2] or 'N/A'}\n  Status: {r[3] or 'N/A'}"
+            for r in rows
+        ]
+        return f"Assets in Category '{category}' ({len(rows)} assets found):\n" + "\n".join(asset_list)
+    except Exception as e:
+        logging.error(f"DB category list error: {e}")
+        return f"Unable to fetch category '{category}' assets from database."
 
 @mcp.tool()
 async def get_assets_by_department(department: str, limit: int = 20) -> str:
@@ -253,32 +339,39 @@ async def get_asset_details(asset_id: str) -> str:
     Args:
         asset_id: The unique identifier of the asset.
     """
-    logging.info(f"Executing get_asset_details tool with asset_id='{asset_id}'")
-    data = await make_sams_request(f"/assets/{asset_id}")
-
-    if not data or "data" not in data:
-        return f"Unable to fetch asset details for ID '{asset_id}' from SAMS API."
-
-    asset = data["data"]
-    
-    return (
-        f"Asset Details for ID {asset_id}:\n"
-        f"- Name: {asset.get('name', 'N/A')}\n"
-        f"- Serial Number: {asset.get('serial_number', 'N/A')}\n"
-        f"- Model: {asset.get('model', 'N/A')}\n"
-        f"- Description: {asset.get('description', 'N/A')}\n"
-        f"- Status: {asset.get('status', 'N/A')}\n"
-        f"- Category: {asset.get('category', {}).get('name', 'N/A')}\n"
-        f"- Department: {asset.get('department', {}).get('name', 'N/A')}\n"
-        f"- Acquisition Date: {asset.get('acquisition_date', 'N/A')}\n"
-        f"- Acquisition Cost: Rp{asset.get('acquisition_cost', 0):,.2f}\n"
-        f"- Current Value: Rp{asset.get('current_value', 0):,.2f}\n"
-        f"- Location: {asset.get('location', 'N/A')}\n"
-        f"- Building: {asset.get('building', 'N/A')}\n"
-        f"- Room: {asset.get('room', 'N/A')}\n"
-        f"- Criticality: {asset.get('criticality', 'N/A')}\n"
-        f"- Condition: {asset.get('condition', 'N/A')}"
-    )
+    logging.info(f"Executing get_asset_details tool (DB) asset_id='{asset_id}'")
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, name, serial_number, model, description, status,
+                           acquisition_date, acquisition_cost, current_value, criticality, condition
+                    FROM assets
+                    WHERE deleted_at IS NULL AND id = %s
+                    """,
+                    (asset_id,)
+                )
+                row = cur.fetchone()
+        if not row:
+            return f"Unable to fetch asset details for ID '{asset_id}'."
+        (aid, name, sn, model, desc, status, acq_date, acq_cost, curr_val, criticality, condition) = row
+        return (
+            f"Asset Details for ID {aid}:\n"
+            f"- Name: {name or 'N/A'}\n"
+            f"- Serial Number: {sn or 'N/A'}\n"
+            f"- Model: {model or 'N/A'}\n"
+            f"- Description: {desc or 'N/A'}\n"
+            f"- Status: {status or 'N/A'}\n"
+            f"- Acquisition Date: {acq_date or 'N/A'}\n"
+            f"- Acquisition Cost: Rp{float(acq_cost or 0):,.2f}\n"
+            f"- Current Value: Rp{float(curr_val or 0):,.2f}\n"
+            f"- Criticality: {criticality or 'N/A'}\n"
+            f"- Condition: {condition or 'N/A'}"
+        )
+    except Exception as e:
+        logging.error(f"DB asset details error: {e}")
+        return f"Unable to fetch asset details for ID '{asset_id}' from database."
 
 @mcp.tool()
 async def get_assets_by_value_range(min_value: float = 0, max_value: float = 1000000, limit: int = 20) -> str:
@@ -327,49 +420,59 @@ async def get_category_summary() -> str:
     """
     Get a summary of assets grouped by category with total values.
     """
-    logging.info("Executing get_category_summary tool")
-    data = await make_sams_request("/assets/summary-by-category")
-
-    if not data or "data" not in data:
-        return "Unable to fetch category summary from SAMS API."
-
-    categories = data["data"]
-    if not categories:
-        return "No category data found."
-
-    category_list = []
-    for category in categories:
-        category_list.append(
-            f"- {category.get('category_name', 'Unknown')}: "
-            f"{category.get('asset_count', 0)} assets, "
-            f"Total Value: Rp{category.get('total_value', 0):,.2f}"
-        )
-    
-    return "Assets by Category:\n" + "\n".join(category_list)
+    logging.info("Executing get_category_summary tool (DB)")
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT c.name AS category_name,
+                           COUNT(a.id) AS asset_count,
+                           COALESCE(SUM(a.current_value),0) AS total_value
+                    FROM categories c
+                    LEFT JOIN assets a ON a.category_id = c.id AND a.deleted_at IS NULL
+                    GROUP BY c.name
+                    ORDER BY c.name
+                    """
+                )
+                rows = cur.fetchall()
+        if not rows:
+            return "No category data found."
+        category_list = [
+            f"- {r[0]}: {r[1]} assets, Total Value: Rp{float(r[2]):,.2f}"
+            for r in rows
+        ]
+        return "Assets by Category:\n" + "\n".join(category_list)
+    except Exception as e:
+        logging.error(f"DB category summary error: {e}")
+        return "Unable to compute category summary from database."
 
 @mcp.tool()
 async def get_status_summary() -> str:
     """
     Get a summary of assets grouped by status.
     """
-    logging.info("Executing get_status_summary tool")
-    data = await make_sams_request("/assets/summary-by-status")
-
-    if not data or "data" not in data:
-        return "Unable to fetch status summary from SAMS API."
-
-    statuses = data["data"]
-    if not statuses:
-        return "No status data found."
-
-    status_list = []
-    for status in statuses:
-        status_list.append(
-            f"- {status.get('status', 'Unknown')}: "
-            f"{status.get('asset_count', 0)} assets"
-        )
-    
-    return "Assets by Status:\n" + "\n".join(status_list)
+    logging.info("Executing get_status_summary tool (DB)")
+    try:
+        with get_db_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT status, COUNT(*) AS asset_count
+                    FROM assets
+                    WHERE deleted_at IS NULL
+                    GROUP BY status
+                    ORDER BY status
+                    """
+                )
+                rows = cur.fetchall()
+        if not rows:
+            return "No status data found."
+        status_list = [f"- {r[0]}: {r[1]} assets" for r in rows]
+        return "Assets by Status:\n" + "\n".join(status_list)
+    except Exception as e:
+        logging.error(f"DB status summary error: {e}")
+        return "Unable to compute status summary from database."
 
 @mcp.tool()
 async def get_assets_by_location(location_query: str, limit: int = 20) -> str:
@@ -517,6 +620,7 @@ async def list_tools():
                 'get_asset_summary': get_asset_summary,
                 'get_recent_assets': get_recent_assets,
                 'search_assets': search_assets,
+                'search_assets_by_name': search_assets_by_name,
                 'get_assets_by_status': get_assets_by_status,
                 'get_assets_by_category': get_assets_by_category,
                 'get_assets_by_department': get_assets_by_department,
@@ -563,13 +667,14 @@ async def list_tools_alt():
     return await list_tools()
 
 @app.post("/call/{tool_name}")
-async def call_tool(tool_name: str, params: dict[str, Any]):
+async def call_tool(tool_name: str, params: dict[str, Any], request: Request):
     """Endpoint to execute a specific tool with given parameters."""
     # Map tool names to functions
     tool_map = {
         'get_asset_summary': get_asset_summary,
         'get_recent_assets': get_recent_assets,
         'search_assets': search_assets,
+        'search_assets_by_name': search_assets_by_name,
         'get_assets_by_status': get_assets_by_status,
         'get_assets_by_category': get_assets_by_category,
         'get_assets_by_department': get_assets_by_department,
@@ -585,9 +690,14 @@ async def call_tool(tool_name: str, params: dict[str, Any]):
         raise HTTPException(status_code=404, detail=f"Tool '{tool_name}' not found.")
 
     tool_func = tool_map[tool_name]
+    # Extract Authorization header (if any) to forward to backend requests
+    auth_header = request.headers.get("Authorization", "")
     try:
         logging.info(f"Calling tool '{tool_name}' with params: {params}")
         # Note: This assumes all tool functions are async
+        # Inject auth header into params if tool supports it
+        if 'auth_header' in inspect.signature(tool_func).parameters:
+            params['auth_header'] = auth_header
         result = await tool_func(**params)
         return {"result": result}
     except Exception as e:

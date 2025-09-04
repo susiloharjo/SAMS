@@ -68,7 +68,7 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-                  - NEXT_PUBLIC_API_URL=http://localhost:8081
+      - NEXT_PUBLIC_API_URL=http://localhost:8081
       - NEXT_PUBLIC_ENVIRONMENT=${NEXT_PUBLIC_ENVIRONMENT}
     depends_on:
       - sams-backend
@@ -81,10 +81,17 @@ services:
       dockerfile: Dockerfile
     environment:
       - SAMS_API_BASE=http://sams-backend:8081/api/v1
+      - MCP_SERVICE_TOKEN=${MCP_SERVICE_TOKEN}
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
     ports:
       - "8082:8081"
     depends_on:
       - sams-backend
+    restart: unless-stopped
 
 volumes:
   postgres_data:

@@ -239,7 +239,7 @@ func determineMCPTool(message string) (string, map[string]interface{}) {
 	// If the message contains specific asset names, models, or serial numbers, use search
 	if containsSpecificAssetReference(message) {
 		assetName := extractAssetName(message)
-		return "search_assets", map[string]interface{}{"query": assetName, "limit": 10}
+		return "search_assets_by_name", map[string]interface{}{"asset_name": assetName, "limit": 10}
 	}
 
 	// PRIORITY 1: Value and summary queries (highest priority)
