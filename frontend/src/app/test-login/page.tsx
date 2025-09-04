@@ -11,7 +11,7 @@ export default function TestLogin() {
     setResult('Testing backend connection...');
     
     try {
-      const response = await fetch('http://localhost:8080/health');
+      const response = await fetch('http://localhost:8081/health');
       const data = await response.json();
       setResult(prev => prev + '\n✅ Backend health: ' + JSON.stringify(data));
     } catch (error) {
@@ -26,14 +26,14 @@ export default function TestLogin() {
     setResult('Testing login...');
     
     try {
-      const response = await fetch('http://localhost:8080/api/v1/auth/login', {
+      const response = await fetch('http://localhost:8081/api/v1/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          username: 'admin',
-          password: 'user.1001'
+          username: 'invalid_user',
+          password: 'invalid_password'
         }),
       });
       
@@ -51,7 +51,7 @@ export default function TestLogin() {
     setResult('Testing simple login...');
     
     try {
-      const response = await fetch('http://localhost:8080/api/v1/test-login', {
+      const response = await fetch('http://localhost:8081/api/v1/test-login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

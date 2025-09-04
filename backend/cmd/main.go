@@ -132,6 +132,7 @@ func main() {
 	app.Get("/api/v1/users/:id", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.GetUser)
 	app.Put("/api/v1/users/:id", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.UpdateUser)
 	app.Delete("/api/v1/users/:id", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.DeleteUser)
+	app.Put("/api/v1/users/:id/password", middleware.AuthMiddleware(), middleware.RequireAdmin(), userHandler.UpdateUserPassword)
 
 	// User Profile Routes (authenticated users can manage their own profile)
 	app.Post("/api/v1/auth/change-password", middleware.AuthMiddleware(), middleware.RequireUser(), authHandler.ChangePassword)

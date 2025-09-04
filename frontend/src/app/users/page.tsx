@@ -5,6 +5,7 @@ import { Users, Plus, Search, Edit, Trash2, Eye } from 'lucide-react';
 import UserAddEditModal from '@/components/users/UserAddEditModal';
 import UserDeleteModal from '@/components/users/UserDeleteModal';
 import UserViewModal from '@/components/users/UserViewModal';
+import UserPasswordUpdateModal from '@/components/users/UserPasswordUpdateModal';
 import { PaginationControls } from '@/components/assets/PaginationControls';
 import { api } from '@/utils/api';
 
@@ -45,6 +46,8 @@ export default function UsersPage() {
   const [showViewModal, setShowViewModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [showPasswordUpdateModal, setShowPasswordUpdateModal] = useState(false);
+  const [userToUpdatePassword, setUserToUpdatePassword] = useState<{ id: string; username: string } | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -102,6 +105,11 @@ export default function UsersPage() {
     setShowDeleteModal(true);
   };
 
+  const handleUpdatePassword = (user: User) => {
+    setUserToUpdatePassword({ id: user.id, username: user.username });
+    setShowPasswordUpdateModal(true);
+  };
+
   const handleUserSaved = () => {
     setShowAddModal(false);
     setShowEditModal(false);
@@ -111,6 +119,18 @@ export default function UsersPage() {
   const handleUserDeleted = () => {
     setShowDeleteModal(false);
     fetchUsers();
+  };
+
+  const handleModalClose = () => {
+    setShowAddModal(false);
+    setShowEditModal(false);
+    setShowViewModal(false);
+    setShowDeleteModal(false);
+    setShowPasswordUpdateModal(false);
+    setSelectedUser(null);
+    setEditingUser(null);
+    setUserToUpdatePassword(null);
+    fetchUsers(); // Refresh data after any modal action
   };
 
   const getRoleBadgeColor = (role: string) => {
@@ -255,6 +275,15 @@ export default function UsersPage() {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => handleUpdatePassword(user)}
+                          className="text-blue-600 hover:text-blue-900 p-1 rounded hover:bg-blue-50"
+                          title="Update Password"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 1.5H2.25a.75.75 0 0 0-.75.75v6.75c0 .414.336.75.75.75h14.25a.75.75 0 0 0 .75-.75v-6.75a.75.75 0 0 0-.75-.75H15Z" />
+                          </svg>
+                        </button>
+                        <button
                           onClick={() => handleDeleteUser(user)}
                           className="text-red-600 hover:text-red-900 p-1 rounded hover:bg-red-50"
                           title="Delete User"
@@ -289,7 +318,7 @@ export default function UsersPage() {
       {showAddModal && (
         <UserAddEditModal
           isOpen={showAddModal}
-          onClose={() => setShowAddModal(false)}
+          onClose={handleModalClose}
           onSaved={handleUserSaved}
           departments={departments}
         />
@@ -298,7 +327,7 @@ export default function UsersPage() {
       {showEditModal && editingUser && (
         <UserAddEditModal
           isOpen={showEditModal}
-          onClose={() => setShowEditModal(false)}
+          onClose={handleModalClose}
           onSaved={handleUserSaved}
           user={editingUser}
           departments={departments}
@@ -309,7 +338,7 @@ export default function UsersPage() {
       {showViewModal && selectedUser && (
         <UserViewModal
           isOpen={showViewModal}
-          onClose={() => setShowViewModal(false)}
+          onClose={handleModalClose}
           user={selectedUser}
         />
       )}
@@ -317,9 +346,19 @@ export default function UsersPage() {
       {showDeleteModal && selectedUser && (
         <UserDeleteModal
           isOpen={showDeleteModal}
-          onClose={() => setShowDeleteModal(false)}
+          onClose={handleModalClose}
           onDeleted={handleUserDeleted}
           user={selectedUser}
+        />
+      )}
+
+      {showPasswordUpdateModal && userToUpdatePassword && (
+        <UserPasswordUpdateModal
+          isOpen={showPasswordUpdateModal}
+          onClose={handleModalClose}
+          onSuccess={handleModalClose}
+          userId={userToUpdatePassword.id}
+          username={userToUpdatePassword.username}
         />
       )}
     </div>

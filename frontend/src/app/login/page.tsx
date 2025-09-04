@@ -34,8 +34,8 @@ interface LoginResponse {
 
 export default function LoginPage() {
   const [formData, setFormData] = useState<LoginForm>({
-    username: 'admin',
-    password: 'user.1001',
+    username: '',
+    password: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');

@@ -1,15 +1,21 @@
 package handlers
 
 import (
+	"errors"
 	"strconv"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
 	"sams-backend/internal/models"
+	// "sams-backend/internal/database" // Removed unused import
+
+	"github.com/go-playground/validator/v10"
+	"golang.org/x/crypto/bcrypt"
 )
+
+var validate = validator.New()
 
 // UserHandler handles user-related HTTP requests
 type UserHandler struct {
@@ -35,7 +41,7 @@ func (h *UserHandler) GetUsers(c *fiber.Ctx) error {
 	query := h.db.Model(&models.User{}).Preload("Department")
 
 	if search != "" {
-		query = query.Where("username ILIKE ? OR email ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ?", 
+		query = query.Where("username ILIKE ? OR email ILIKE ? OR first_name ILIKE ? OR last_name ILIKE ?",
 			"%"+search+"%", "%"+search+"%", "%"+search+"%", "%"+search+"%")
 	}
 
@@ -60,15 +66,15 @@ func (h *UserHandler) GetUsers(c *fiber.Ctx) error {
 			ID:           user.ID,
 			Username:     user.Username,
 			Email:        user.Email,
-			FirstName:   user.FirstName,
-			LastName:    user.LastName,
-			Role:        user.Role,
+			FirstName:    user.FirstName,
+			LastName:     user.LastName,
+			Role:         user.Role,
 			DepartmentID: user.DepartmentID,
 			Department:   user.Department,
-			IsActive:    user.IsActive,
-			LastLogin:   user.LastLogin,
-			CreatedAt:   user.CreatedAt,
-			UpdatedAt:   user.UpdatedAt,
+			IsActive:     user.IsActive,
+			LastLogin:    user.LastLogin,
+			CreatedAt:    user.CreatedAt,
+			UpdatedAt:    user.UpdatedAt,
 		})
 	}
 
@@ -109,15 +115,15 @@ func (h *UserHandler) GetUser(c *fiber.Ctx) error {
 		ID:           user.ID,
 		Username:     user.Username,
 		Email:        user.Email,
-		FirstName:   user.FirstName,
-		LastName:    user.LastName,
-		Role:        user.Role,
+		FirstName:    user.FirstName,
+		LastName:     user.LastName,
+		Role:         user.Role,
 		DepartmentID: user.DepartmentID,
 		Department:   user.Department,
-		IsActive:    user.IsActive,
-		LastLogin:   user.LastLogin,
-		CreatedAt:   user.CreatedAt,
-		UpdatedAt:   user.UpdatedAt,
+		IsActive:     user.IsActive,
+		LastLogin:    user.LastLogin,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
 	}
 
 	return c.JSON(fiber.Map{
@@ -160,12 +166,12 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 	user := models.User{
 		Username:     req.Username,
 		Email:        req.Email,
-		FirstName:   req.FirstName,
-		LastName:    req.LastName,
-		Password:    string(hashedPassword),
-		Role:        req.Role,
+		FirstName:    req.FirstName,
+		LastName:     req.LastName,
+		Password:     string(hashedPassword),
+		Role:         req.Role,
 		DepartmentID: req.DepartmentID,
-		IsActive:    true,
+		IsActive:     true,
 	}
 
 	if err := h.db.Create(&user).Error; err != nil {
@@ -183,19 +189,19 @@ func (h *UserHandler) CreateUser(c *fiber.Ctx) error {
 		ID:           user.ID,
 		Username:     user.Username,
 		Email:        user.Email,
-		FirstName:   user.FirstName,
-		LastName:    user.LastName,
-		Role:        user.Role,
+		FirstName:    user.FirstName,
+		LastName:     user.LastName,
+		Role:         user.Role,
 		DepartmentID: user.DepartmentID,
 		Department:   user.Department,
-		IsActive:    user.IsActive,
-		LastLogin:   user.LastLogin,
-		CreatedAt:   user.CreatedAt,
-		UpdatedAt:   user.UpdatedAt,
+		IsActive:     user.IsActive,
+		LastLogin:    user.LastLogin,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
 	}
 
 	return c.Status(fiber.StatusCreated).JSON(fiber.Map{
-		"data": userResponse,
+		"data":    userResponse,
 		"message": "User created successfully",
 	})
 }
@@ -287,19 +293,19 @@ func (h *UserHandler) UpdateUser(c *fiber.Ctx) error {
 		ID:           user.ID,
 		Username:     user.Username,
 		Email:        user.Email,
-		FirstName:   user.FirstName,
-		LastName:    user.LastName,
-		Role:        user.Role,
+		FirstName:    user.FirstName,
+		LastName:     user.LastName,
+		Role:         user.Role,
 		DepartmentID: user.DepartmentID,
 		Department:   user.Department,
-		IsActive:    user.IsActive,
-		LastLogin:   user.LastLogin,
-		CreatedAt:   user.CreatedAt,
-		UpdatedAt:   user.UpdatedAt,
+		IsActive:     user.IsActive,
+		LastLogin:    user.LastLogin,
+		CreatedAt:    user.CreatedAt,
+		UpdatedAt:    user.UpdatedAt,
 	}
 
 	return c.JSON(fiber.Map{
-		"data": userResponse,
+		"data":    userResponse,
 		"message": "User updated successfully",
 	})
 }
@@ -335,6 +341,50 @@ func (h *UserHandler) DeleteUser(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{
 		"message": "User deleted successfully",
 	})
+}
+
+// UpdateUserPassword allows an admin to update a user's password
+func (h *UserHandler) UpdateUserPassword(c *fiber.Ctx) error {
+	// Parse user ID from URL parameter
+	id := c.Params("id")
+	userID, err := uuid.Parse(id)
+	if err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid user ID"})
+	}
+
+	// Parse request body
+	var req models.UserPasswordUpdateRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request body"})
+	}
+
+	// Validate request
+	if err := validate.Struct(req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	// Find user
+	var user models.User
+	if err := h.db.First(&user, "id = ?", userID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "User not found"})
+		}
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to fetch user"})
+	}
+
+	// Hash the new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to hash password"})
+	}
+
+	// Update user's password
+	user.Password = string(hashedPassword)
+	if err := h.db.Save(&user).Error; err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to update password"})
+	}
+
+	return c.Status(fiber.StatusOK).JSON(fiber.Map{"message": "User password updated successfully"})
 }
 
 // GetUserSummary retrieves user statistics

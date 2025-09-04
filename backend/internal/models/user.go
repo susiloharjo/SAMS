@@ -73,3 +73,8 @@ type UserResponse struct {
 	CreatedAt    time.Time   `json:"created_at"`
 	UpdatedAt    time.Time   `json:"updated_at"`
 }
+
+// UserPasswordUpdateRequest represents the request to update a user's password by an admin
+type UserPasswordUpdateRequest struct {
+	NewPassword string `json:"new_password" validate:"required,min=8"`
+}
