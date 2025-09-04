@@ -140,7 +140,7 @@ func main() {
 	// Start server
 	port := os.Getenv("SERVER_PORT")
 	if port == "" {
-		port = "8080"
+		port = "8081"
 	}
 
 	log.Printf("Starting SAMS Backend on port %s", port)

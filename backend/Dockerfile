@@ -48,7 +48,7 @@ RUN chown -R appuser:appgroup /app
 USER appuser
 
 # Expose port
-EXPOSE 8080
+EXPOSE 8081
 
 # Run the application
-CMD ["sh", "-c", "ls -la /app && /app/main"]
+CMD ["./main"]

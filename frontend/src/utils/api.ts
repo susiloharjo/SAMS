@@ -1,6 +1,6 @@
-// API utility functions with automatic authentication
+import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081';
 
 // Get authentication headers
 export const getAuthHeaders = (): HeadersInit => {
