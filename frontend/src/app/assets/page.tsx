@@ -172,6 +172,11 @@ export default function AssetsPage() {
       }
 
       const url = `/api/v1/assets?${params.toString()}`;
+      console.log('🔍 Fetching assets with URL:', url);
+      console.log('🔍 Category filter:', categoryFilter);
+      console.log('🔍 Status filter:', statusFilter);
+      console.log('🔍 Search term:', debouncedSearchTerm);
+      
       const response = await api.get(url)
       
       if (!response.ok) {
@@ -179,15 +184,20 @@ export default function AssetsPage() {
       }
       const data = await response.json()
       
+      console.log('📊 Assets API response:', data);
+      console.log('📊 Assets count:', data.data?.length || 0);
+      console.log('📊 Assets data:', data.data);
+      
       if (data.error === false) {
         setAssets(data.data || [])
         setTotalAssets(data.pagination.total)
         setTotalPages(data.pagination.total_pages)
+        console.log('✅ Assets set successfully:', data.data?.length || 0, 'assets');
       } else {
-        console.error('Error fetching assets:', data.message)
+        console.error('❌ Error fetching assets:', data.message)
       }
     } catch (error) {
-      console.error('Error fetching assets:', error)
+      console.error('❌ Error fetching assets:', error)
     } finally {
       setLoading(false)
     }
@@ -195,14 +205,19 @@ export default function AssetsPage() {
 
   const fetchCategories = async () => {
     try {
+      console.log('🏷️ Fetching categories...');
       const response = await api.get('/api/v1/categories')
       if (!response.ok) {
         throw new Error('Failed to fetch categories');
       }
       const data = await response.json()
+      console.log('🏷️ Categories API response:', data);
+      console.log('🏷️ Categories count:', data.data?.length || 0);
+      console.log('🏷️ Categories data:', data.data);
       setCategories(data.data || [])
+      console.log('✅ Categories set successfully:', data.data?.length || 0, 'categories');
     } catch (error) {
-      console.error('Error fetching categories:', error)
+      console.error('❌ Error fetching categories:', error)
     }
   }
 

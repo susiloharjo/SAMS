@@ -233,7 +233,9 @@ func callMCPTool(toolName string, params map[string]interface{}) (string, error)
 
 // Determine which MCP tool to use based on the message
 func determineMCPTool(message string) (string, map[string]interface{}) {
+	log.Printf("determineMCPTool: analyzing message: '%s'", message)
 	lowerMessage := strings.ToLower(message)
+	log.Printf("determineMCPTool: lowerMessage: '%s'", lowerMessage)
 
 	// Check for specific asset queries first (before generic patterns)
 	// If the message contains specific asset names, models, or serial numbers, use search
@@ -257,12 +259,44 @@ func determineMCPTool(message string) (string, map[string]interface{}) {
 		if strings.Contains(lowerMessage, "tool") || strings.Contains(lowerMessage, "tools") {
 			return "get_category_total_value", map[string]interface{}{"category": "Tools"}
 		}
+		if strings.Contains(lowerMessage, "real estate") || strings.Contains(lowerMessage, "realestate") || strings.Contains(lowerMessage, "property") || strings.Contains(lowerMessage, "building") || strings.Contains(lowerMessage, "warehouse") {
+			return "get_category_total_value", map[string]interface{}{"category": "Real Estate"}
+		}
 
 		// For general value queries, get all assets to calculate total
 		return "get_asset_summary", map[string]interface{}{}
 	}
 
 	// PRIORITY 2: Category-specific queries
+	// Check for "by category" pattern first
+	log.Printf("determineMCPTool: checking for 'by category' pattern")
+	if strings.Contains(lowerMessage, "by category") {
+		log.Printf("determineMCPTool: found 'by category' pattern")
+		if strings.Contains(lowerMessage, "it equipment") || (strings.Contains(lowerMessage, "it") && strings.Contains(lowerMessage, "equipment")) {
+			return "get_assets_by_category", map[string]interface{}{"category": "IT Equipment", "limit": 20}
+		}
+		if strings.Contains(lowerMessage, "vehicle") || strings.Contains(lowerMessage, "vehicles") {
+			return "get_assets_by_category", map[string]interface{}{"category": "Vehicles", "limit": 20}
+		}
+		if strings.Contains(lowerMessage, "tool") || strings.Contains(lowerMessage, "tools") {
+			return "get_assets_by_category", map[string]interface{}{"category": "Tools", "limit": 20}
+		}
+		if strings.Contains(lowerMessage, "real estate") || strings.Contains(lowerMessage, "realestate") || strings.Contains(lowerMessage, "property") || strings.Contains(lowerMessage, "building") || strings.Contains(lowerMessage, "warehouse") {
+			log.Printf("determineMCPTool: found Real Estate category in 'by category' pattern")
+			return "get_assets_by_category", map[string]interface{}{"category": "Real Estate", "limit": 20}
+		}
+		if strings.Contains(lowerMessage, "furniture") {
+			return "get_assets_by_category", map[string]interface{}{"category": "Furniture", "limit": 20}
+		}
+		if strings.Contains(lowerMessage, "machinery") {
+			return "get_assets_by_category", map[string]interface{}{"category": "Machinery", "limit": 20}
+		}
+		if strings.Contains(lowerMessage, "software") {
+			return "get_assets_by_category", map[string]interface{}{"category": "Software", "limit": 20}
+		}
+	}
+
+	// General category queries (without "by category")
 	if strings.Contains(lowerMessage, "it equipment") || (strings.Contains(lowerMessage, "it") && strings.Contains(lowerMessage, "equipment")) {
 		return "get_assets_by_category", map[string]interface{}{"category": "IT Equipment", "limit": 20}
 	}
@@ -271,6 +305,9 @@ func determineMCPTool(message string) (string, map[string]interface{}) {
 	}
 	if strings.Contains(lowerMessage, "tool") || strings.Contains(lowerMessage, "tools") {
 		return "get_assets_by_category", map[string]interface{}{"category": "Tools", "limit": 20}
+	}
+	if strings.Contains(lowerMessage, "real estate") || strings.Contains(lowerMessage, "realestate") || strings.Contains(lowerMessage, "property") || strings.Contains(lowerMessage, "building") || strings.Contains(lowerMessage, "warehouse") {
+		return "get_assets_by_category", map[string]interface{}{"category": "Real Estate", "limit": 20}
 	}
 
 	// PRIORITY 2.5: Department-specific queries
@@ -356,6 +393,7 @@ func determineMCPTool(message string) (string, map[string]interface{}) {
 // HandleAIQuery is the main handler for the AI chat functionality.
 func HandleAIQuery(c *fiber.Ctx) error {
 	log.Println("HandleAIQuery: received new request")
+	log.Println("HandleAIQuery: DEBUG - function called successfully")
 	var req AIChatRequest
 	if err := c.BodyParser(&req); err != nil {
 		log.Printf("HandleAIQuery: error parsing request body: %v\n", err)
@@ -368,7 +406,9 @@ func HandleAIQuery(c *fiber.Ctx) error {
 	log.Printf("HandleAIQuery: FORCE GEMINI TOOL MODE - instructing Gemini to use MCP tools for: %s", req.Message)
 
 	// Determine which MCP tool to use
+	log.Println("HandleAIQuery: DEBUG - about to call determineMCPTool")
 	toolName, params := determineMCPTool(req.Message)
+	log.Printf("HandleAIQuery: determined tool: %s with params: %v", toolName, params)
 
 	// Call MCP server to get actual data
 	mcpResult, err := callMCPTool(toolName, params)

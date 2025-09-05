@@ -1,6 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8081';
+console.log('🌐 API_BASE_URL configured as:', API_BASE_URL);
 
 // Get authentication headers
 export const getAuthHeaders = (): HeadersInit => {
@@ -86,11 +87,17 @@ export const authenticatedFetch = async (
   };
 
   // Make the request with the token
+  console.log('🚀 Making API request to:', url);
+  console.log('🚀 Request headers:', headers);
+  
   const response = await fetch(url, {
     ...options,
     headers,
   });
 
+  console.log('📡 API response status:', response.status);
+  console.log('📡 API response URL:', response.url);
+  
   return response;
 };
 
