@@ -36,7 +36,7 @@ WORKDIR /app
 COPY --from=builder /app/main .
 
 # Copy wait script
-COPY ../wait-for-db.sh .
+COPY wait-for-db.sh .
 
 # Copy .env file if it exists
 COPY .env* ./

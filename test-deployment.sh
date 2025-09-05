@@ -24,7 +24,7 @@ echo ""
 
 # Clean up any existing containers
 echo "🧹 Cleaning up existing containers..."
-docker-compose down -v
+docker compose down -v
 
 # Remove any existing volumes to ensure clean start
 echo "🗑️  Removing existing volumes..."
@@ -32,7 +32,7 @@ docker volume rm sams_postgres_data 2>/dev/null || true
 
 # Build and start services
 echo "🔨 Building and starting services..."
-docker-compose up --build -d
+docker compose up --build -d
 
 # Wait for services to be ready
 echo "⏳ Waiting for services to be ready..."
@@ -40,7 +40,7 @@ sleep 30
 
 # Check if services are running
 echo "🔍 Checking service status..."
-docker-compose ps
+docker compose ps
 
 # Test database connection
 echo "🗄️  Testing database connection..."
@@ -61,4 +61,4 @@ curl -s http://localhost:8082/ 2>/dev/null && echo "✅ MCP server responding" |
 
 echo ""
 echo "=== Deployment Test Complete ==="
-echo "Check the logs with: docker-compose logs -f"
+echo "Check the logs with: docker compose logs -f"
