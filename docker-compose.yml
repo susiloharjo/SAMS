@@ -67,14 +67,14 @@ services:
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-        - NEXT_PUBLIC_API_URL=http://localhost:8081
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
         - NEXT_PUBLIC_ENVIRONMENT=${NEXT_PUBLIC_ENVIRONMENT}
     container_name: sams-frontend
     ports:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}
-      - NEXT_PUBLIC_API_URL=http://localhost:8081
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
       - NEXT_PUBLIC_ENVIRONMENT=${NEXT_PUBLIC_ENVIRONMENT}
     depends_on:
       - sams-backend
